@@ -17,6 +17,7 @@ import {
   Visibility,
   VisibilityOff,
   Login as LoginIcon,
+  Home as HomeIcon,
 } from "@mui/icons-material";
 import { useNavigate, Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
@@ -203,6 +204,26 @@ export default function Login() {
                 {t("auth.register_now", "Sign up now")}
               </Link>
             </Typography>
+          </Box>
+
+          {/* Back to Home Button */}
+          <Box sx={{ textAlign: "center", mt: 3 }}>
+            <Button
+              startIcon={<HomeIcon />}
+              variant="outlined"
+              color="primary"
+              onClick={() => navigate("/")}
+              fullWidth
+              sx={{
+                "&:hover": {
+                  background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                  color: "white",
+                  borderColor: "#667eea",
+                },
+              }}
+            >
+              {t("auth.back_to_home", "Back to Home")}
+            </Button>
           </Box>
         </Paper>
       </Container>

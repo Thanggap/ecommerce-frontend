@@ -36,6 +36,25 @@ export default function ChatWidget() {
   const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  // Load chat history from localStorage on mount
+  useEffect(() => {
+    const savedMessages = localStorage.getItem("chatMessages");
+    if (savedMessages) {
+      try {
+        setMessages(JSON.parse(savedMessages));
+      } catch (error) {
+        console.error("Failed to load chat history:", error);
+      }
+    }
+  }, []);
+
+  // Save chat history to localStorage whenever messages change
+  useEffect(() => {
+    if (messages.length > 0) {
+      localStorage.setItem("chatMessages", JSON.stringify(messages));
+    }
+  }, [messages]);
+
   // Scroll to bottom when new message
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -129,9 +148,22 @@ export default function ChatWidget() {
                 Powered by AI
               </Typography>
             </Box>
-            <IconButton size="small" onClick={() => setOpen(false)} sx={{ color: "white" }}>
-              <CloseIcon />
-            </IconButton>
+            <Box sx={{ display: "flex", gap: 0.5 }}>
+              <IconButton
+                size="small"
+                onClick={() => {
+                  setMessages([]);
+                  localStorage.removeItem("chatMessages");
+                }}
+                sx={{ color: "white" }}
+                title="Clear chat history"
+              >
+                <span style={{ fontSize: "20px" }}>🗑️</span>
+              </IconButton>
+              <IconButton size="small" onClick={() => setOpen(false)} sx={{ color: "white" }}>
+                <CloseIcon />
+              </IconButton>
+            </Box>
           </Box>
 
           {/* Messages */}
