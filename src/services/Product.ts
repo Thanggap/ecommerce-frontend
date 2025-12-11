@@ -28,6 +28,7 @@ export interface IProductFilters {
   manufacturer?: string;
   certification?: string;
   on_sale?: boolean;
+  sort_by?: string;
 }
 
 export const getProductList = async (filters: IProductFilters = {}) => {

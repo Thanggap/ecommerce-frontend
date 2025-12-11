@@ -53,10 +53,10 @@ const PRODUCT_TYPES = [
 ];
 
 const SORT_OPTIONS = [
-  { value: "newest", label: "product.sort.newest" },
-  { value: "price_asc", label: "product.sort.price_low" },
-  { value: "price_desc", label: "product.sort.price_high" },
-  { value: "popular", label: "product.sort.popular" },
+  { value: "newest", label: "Newest" },
+  { value: "price_asc", label: "Price: Low to High" },
+  { value: "price_desc", label: "Price: High to Low" },
+  { value: "popular", label: "Most Popular" },
 ];
 
 export default function Products() {
@@ -203,6 +203,7 @@ export default function Products() {
         manufacturer: manufacturer || undefined,
         certification: certification || undefined,
         on_sale: onSale || undefined,
+        sort_by: sortBy || undefined,
       };
       fetchProducts(filters);
       setSearchMode(false);
@@ -432,7 +433,7 @@ export default function Products() {
               <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: { xs: 1, sm: 2 } }}>
                 <Box>
                   <Typography sx={{ fontWeight: 600, fontSize: { xs: "1.1rem", sm: "1.5rem" } }}>
-                    {productType ? t(`product.filter.${productType.toLowerCase()}`) : t("product.all_products")}
+                    {productType || t("product.all_products")}
                   </Typography>
                   <Typography variant="body2" color="text.secondary" sx={{ fontSize: { xs: "0.75rem", sm: "0.875rem" } }}>
                     {products.length} {t("product.items_found")}
@@ -483,7 +484,7 @@ export default function Products() {
                     >
                       {SORT_OPTIONS.map((option) => (
                         <MenuItem key={option.value} value={option.value}>
-                          {t(option.label)}
+                          {option.label}
                         </MenuItem>
                       ))}
                     </Select>
@@ -519,7 +520,7 @@ export default function Products() {
                 )}
                 {productType && (
                   <Chip
-                    label={t(`product.filter.${productType.toLowerCase()}`)}
+                    label={productType}
                     onDelete={() => setProductType("")}
                     size="small"
                   />
