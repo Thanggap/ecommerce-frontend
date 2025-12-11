@@ -101,7 +101,7 @@ export default function SidebarCategories({ isOpen, onClose }: SidebarCategories
         <Box sx={{ p: 2, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <Box
             component="img"
-            src="/logo-ltk.png"
+            src="/logo-e.svg"
             alt="LTK"
             sx={{ height: 40 }}
           />

@@ -42,7 +42,7 @@ import {
 
 const PRODUCT_TYPES = [
   { value: "", label: "product.filter.all_types" },
-  { value: "Vitamins & Minerals", label: "home.categories.vitamins" },
+  // { value: "Vitamins & Minerals", label: "Vitamins & Minerals" },
   { value: "Protein & Fitness", label: "home.categories.protein" },
   { value: "Weight Management", label: "home.categories.weight_management" },
   { value: "Beauty & Skin", label: "home.categories.beauty" },

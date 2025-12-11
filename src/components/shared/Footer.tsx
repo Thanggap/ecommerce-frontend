@@ -56,7 +56,7 @@ export default function Footer() {
             <Grid item xs={12} md={4}>
               <Box sx={{ mb: 2, textAlign: { xs: "center", md: "left" } }}>
                 <img
-                  src="/logo-ltk.png"
+                  src="/logo-e.svg"
                   alt="LTK Ecommerce"
                   style={{ height: "60px" }}
                 />

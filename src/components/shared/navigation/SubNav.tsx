@@ -14,7 +14,7 @@ export default function SubNav() {
     <Link to="/" style={{ display: "flex", alignItems: "center" }}>
       <Box
         component="img"
-        src="/logo-ltk.png"
+        src="/logo-e.svg"
         alt="LTK Ecommerce"
         sx={{
           height: { xs: "50px", sm: "70px", md: "90px" },

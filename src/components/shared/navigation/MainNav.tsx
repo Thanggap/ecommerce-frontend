@@ -44,7 +44,7 @@ export default function MainNav() {
       >
         <Box
           component="img"
-          src="/logo-ltk.png"
+          src="/logo-e.svg"
           alt="LTK"
           sx={{ height: 40 }}
         />
