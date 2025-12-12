@@ -36,6 +36,17 @@ export interface IOrder {
   total_amount: number;
   status: string;
   note: string | null;
+  
+  // Payment & Refund info
+  payment_intent_id?: string;
+  refund_id?: string;
+  refund_amount?: number;
+  refund_reason?: string;
+  refunded_at?: string;
+  
+  // Return tracking
+  return_requested_at?: string;
+  
   items: IOrderItem[];
   created_at: string;
   updated_at: string;
@@ -82,10 +93,12 @@ export interface IAdminOrderListItem {
   user_id: string;
   user_email: string | null;
   shipping_name: string;
+  shipping_email: string;
   total_amount: number;
   status: string;
   items_count: number;
   created_at: string;
+  updated_at: string;
 }
 
 export interface IAdminOrdersResponse {
@@ -123,6 +136,28 @@ export const adminUpdateOrderStatus = async (orderId: number, status: string): P
   return response.data;
 };
 
+// Admin: Get pending return requests
+export const adminGetPendingReturns = async (page: number = 1, size: number = 20): Promise<IAdminOrdersResponse> => {
+  const response = await api.get('/admin/orders/returns/pending', {
+    params: { page, size }
+  });
+  return response.data;
+};
+
+// Admin: Approve return request
+export const adminApproveReturn = async (orderId: number): Promise<any> => {
+  const response = await api.post(`/admin/orders/${orderId}/returns/approve`);
+  return response.data;
+};
+
+// Admin: Reject return request
+export const adminRejectReturn = async (orderId: number, rejectionReason?: string): Promise<any> => {
+  const response = await api.post(`/admin/orders/${orderId}/returns/reject`, null, {
+    params: { rejection_reason: rejectionReason }
+  });
+  return response.data;
+};
+
 // Export as service object for convenience
 export const orderService = {
   createOrder,
@@ -132,6 +167,9 @@ export const orderService = {
   adminGetOrders,
   adminGetOrderDetail,
   adminUpdateOrderStatus,
+  adminGetPendingReturns,
+  adminApproveReturn,
+  adminRejectReturn,
 };
 
 export default orderService;

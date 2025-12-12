@@ -45,9 +45,14 @@ import {
 const ORDER_STATUSES = [
   { value: "pending", label: "Pending", color: "warning" },
   { value: "confirmed", label: "Confirmed", color: "info" },
+  { value: "processing", label: "Processing", color: "info" },
   { value: "shipped", label: "Shipped", color: "primary" },
   { value: "delivered", label: "Delivered", color: "success" },
   { value: "cancelled", label: "Cancelled", color: "error" },
+  { value: "return_requested", label: "Return Requested", color: "warning" },
+  { value: "return_approved", label: "Return Approved", color: "info" },
+  { value: "refund_pending", label: "Refund Pending", color: "warning" },
+  { value: "refunded", label: "Refunded", color: "secondary" },
 ] as const;
 
 export default function AdminOrders() {

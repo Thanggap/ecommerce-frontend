@@ -17,6 +17,7 @@ import AddProduct from "./pages/admin/AddProduct";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminProducts from "./pages/admin/AdminProducts";
 import AdminOrders from "./pages/admin/AdminOrders";
+import AdminReturnManagement from "./pages/admin/AdminReturnManagement";
 import Profile from "./pages/profile/Profile";
 import CartPage from "./pages/cart/CartPage";
 import CheckoutPage from "./pages/checkout/CheckoutPage";
@@ -169,6 +170,14 @@ function App() {
                 element={
                   <ProtectedRoute requiredRole="admin">
                     <AdminOrders />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/returns"
+                element={
+                  <ProtectedRoute requiredRole="admin">
+                    <AdminReturnManagement />
                   </ProtectedRoute>
                 }
               />

@@ -100,6 +100,9 @@ export default function AdminDashboard() {
         <Button variant="contained" onClick={() => navigate("/admin/orders")}>
           Manage Orders
         </Button>
+        <Button variant="contained" color="warning" onClick={() => navigate("/admin/returns")}>
+          Return Requests
+        </Button>
       </Box>
 
       <Typography variant="h5" gutterBottom>

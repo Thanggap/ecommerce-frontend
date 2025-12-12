@@ -28,7 +28,27 @@ const getStatusColor = (status: string) => {
     case 'shipped': return 'primary';
     case 'delivered': return 'success';
     case 'cancelled': return 'error';
+    case 'return_requested': return 'warning';
+    case 'return_approved': return 'info';
+    case 'refund_pending': return 'warning';
+    case 'refunded': return 'secondary';
     default: return 'default';
+  }
+};
+
+const getStatusLabel = (status: string) => {
+  switch (status) {
+    case 'pending': return 'Pending';
+    case 'confirmed': return 'Confirmed';
+    case 'processing': return 'Processing';
+    case 'shipped': return 'Shipped';
+    case 'delivered': return 'Delivered';
+    case 'cancelled': return 'Cancelled';
+    case 'return_requested': return 'Return Requested';
+    case 'return_approved': return 'Return Approved';
+    case 'refund_pending': return 'Refund Pending';
+    case 'refunded': return 'Refunded';
+    default: return status;
   }
 };
 
@@ -79,7 +99,28 @@ const OrderDetailPage: React.FC = () => {
 
   const canCancelOrder = () => {
     if (!order) return false;
-    return order.status === 'pending' || order.status === 'confirmed';
+    // Can only cancel PENDING or CONFIRMED orders
+    return ['pending', 'confirmed'].includes(order.status);
+  };
+
+  const canRequestReturn = () => {
+    if (!order) return false;
+    // Can only return DELIVERED orders
+    if (order.status !== 'delivered') return false;
+    
+    // Check 7-day window
+    const deliveredDate = new Date(order.updated_at);
+    const now = new Date();
+    const daysSinceDelivery = Math.floor((now.getTime() - deliveredDate.getTime()) / (1000 * 60 * 60 * 24));
+    
+    return daysSinceDelivery <= 7;
+  };
+
+  const getCancelButtonText = () => {
+    if (order?.status === 'pending') return 'Cancel Order';
+    if (order?.status === 'confirmed') return 'Cancel & Refund';
+    if (order?.status === 'delivered') return 'Request Return';
+    return 'Cancel Order';
   };
 
   const formatDate = (dateStr: string) => {
@@ -122,7 +163,7 @@ const OrderDetailPage: React.FC = () => {
           {t('orders.order_detail', 'Order')} #{order.id}
         </Typography>
         <Chip
-          label={order.status}
+          label={getStatusLabel(order.status)}
           color={getStatusColor(order.status) as any}
           sx={{ textTransform: 'capitalize', fontWeight: 'bold' }}
         />
@@ -249,8 +290,64 @@ const OrderDetailPage: React.FC = () => {
               </Box>
             )}
 
-            {/* Cancel Order Button */}
-            {canCancelOrder() && (
+            {/* Refund Information */}
+            {order.refund_id && (
+              <Box sx={{ mt: 3, p: 2, bgcolor: 'warning.light', borderRadius: 1 }}>
+                <Typography variant="subtitle2" fontWeight="bold" gutterBottom>
+                  Refund Information
+                </Typography>
+                <Divider sx={{ mb: 1 }} />
+                
+                <Typography variant="body2" sx={{ mb: 0.5 }}>
+                  <strong>Refund ID:</strong> {order.refund_id}
+                </Typography>
+                
+                {order.refund_amount && (
+                  <Typography variant="body2" sx={{ mb: 0.5 }}>
+                    <strong>Amount:</strong> {formatPrice(order.refund_amount)}
+                  </Typography>
+                )}
+                
+                {order.refund_reason && (
+                  <Typography variant="body2" sx={{ mb: 0.5 }}>
+                    <strong>Reason:</strong> {order.refund_reason}
+                  </Typography>
+                )}
+                
+                {order.refunded_at && (
+                  <Typography variant="body2">
+                    <strong>Refunded At:</strong> {formatDate(order.refunded_at)}
+                  </Typography>
+                )}
+              </Box>
+            )}
+
+            {/* Return Request Info */}
+            {order.return_requested_at && order.status === 'return_requested' && (
+              <Box sx={{ mt: 3, p: 2, bgcolor: 'info.light', borderRadius: 1 }}>
+                <Typography variant="subtitle2" fontWeight="bold" gutterBottom>
+                  Return Request Pending
+                </Typography>
+                <Divider sx={{ mb: 1 }} />
+                
+                <Typography variant="body2" sx={{ mb: 0.5 }}>
+                  <strong>Requested At:</strong> {formatDate(order.return_requested_at)}
+                </Typography>
+                
+                {order.refund_reason && (
+                  <Typography variant="body2">
+                    <strong>Reason:</strong> {order.refund_reason}
+                  </Typography>
+                )}
+                
+                <Alert severity="info" sx={{ mt: 1 }}>
+                  Your return request is being reviewed by our team.
+                </Alert>
+              </Box>
+            )}
+
+            {/* Cancel/Return Order Button */}
+            {(canCancelOrder() || canRequestReturn()) && (
               <Button
                 variant="outlined"
                 color="error"
@@ -259,8 +356,45 @@ const OrderDetailPage: React.FC = () => {
                 disabled={cancelling}
                 sx={{ mt: 2 }}
               >
-                {cancelling ? 'Cancelling...' : 'Cancel Order'}
+                {cancelling ? 'Processing...' : getCancelButtonText()}
               </Button>
+            )}
+
+            {/* Status Messages */}
+            {order.status === 'return_requested' && !order.return_requested_at && (
+              <Alert severity="info" sx={{ mt: 2 }}>
+                Return request pending admin approval.
+              </Alert>
+            )}
+            
+            {order.status === 'return_approved' && (
+              <Alert severity="success" sx={{ mt: 2 }}>
+                Return approved! Refund is being processed.
+              </Alert>
+            )}
+            
+            {order.status === 'refund_pending' && (
+              <Alert severity="info" sx={{ mt: 2 }}>
+                Your refund is being processed. It may take 5-10 business days to appear in your account.
+              </Alert>
+            )}
+            
+            {order.status === 'refunded' && (
+              <Alert severity="success" sx={{ mt: 2 }}>
+                This order has been refunded successfully.
+              </Alert>
+            )}
+            
+            {order.status === 'processing' && (
+              <Alert severity="warning" sx={{ mt: 2 }}>
+                Order is being processed. Contact support to cancel.
+              </Alert>
+            )}
+            
+            {['shipped', 'delivered'].includes(order.status) && (
+              <Alert severity="info" sx={{ mt: 2 }}>
+                Cannot cancel {order.status} orders. Contact support for returns.
+              </Alert>
             )}
           </Paper>
         </Grid>
