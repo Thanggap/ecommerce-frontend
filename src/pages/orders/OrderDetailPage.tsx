@@ -290,38 +290,6 @@ const OrderDetailPage: React.FC = () => {
               </Box>
             )}
 
-            {/* Refund Information */}
-            {order.refund_id && (
-              <Box sx={{ mt: 3, p: 2, bgcolor: 'warning.light', borderRadius: 1 }}>
-                <Typography variant="subtitle2" fontWeight="bold" gutterBottom>
-                  Refund Information
-                </Typography>
-                <Divider sx={{ mb: 1 }} />
-                
-                <Typography variant="body2" sx={{ mb: 0.5 }}>
-                  <strong>Refund ID:</strong> {order.refund_id}
-                </Typography>
-                
-                {order.refund_amount && (
-                  <Typography variant="body2" sx={{ mb: 0.5 }}>
-                    <strong>Amount:</strong> {formatPrice(order.refund_amount)}
-                  </Typography>
-                )}
-                
-                {order.refund_reason && (
-                  <Typography variant="body2" sx={{ mb: 0.5 }}>
-                    <strong>Reason:</strong> {order.refund_reason}
-                  </Typography>
-                )}
-                
-                {order.refunded_at && (
-                  <Typography variant="body2">
-                    <strong>Refunded At:</strong> {formatDate(order.refunded_at)}
-                  </Typography>
-                )}
-              </Box>
-            )}
-
             {/* Return Request Info */}
             {order.return_requested_at && order.status === 'return_requested' && (
               <Box sx={{ mt: 3, p: 2, bgcolor: 'info.light', borderRadius: 1 }}>
@@ -341,7 +309,7 @@ const OrderDetailPage: React.FC = () => {
                 )}
                 
                 <Alert severity="info" sx={{ mt: 1 }}>
-                  Your return request is being reviewed by our team.
+                  Your return request is being reviewed by admin.
                 </Alert>
               </Box>
             )}
