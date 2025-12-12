@@ -11,14 +11,17 @@ import {
   Divider,
   CircularProgress,
   Alert,
+  TextField,
 } from '@mui/material';
 import {
   ArrowBack as BackIcon,
   LocalShipping as ShippingIcon,
+  Delete as DeleteIcon,
 } from '@mui/icons-material';
 import { useTranslation } from 'react-i18next';
 import { useCurrency } from '../../context/CurrencyContext';
 import { orderService, IOrder } from '../../services/Order';
+import api from '../../services/api';
 
 const getStatusColor = (status: string) => {
   switch (status) {
@@ -30,6 +33,9 @@ const getStatusColor = (status: string) => {
     case 'cancelled': return 'error';
     case 'return_requested': return 'warning';
     case 'return_approved': return 'info';
+    case 'return_shipping': return 'primary';
+    case 'return_received': return 'info';
+    case 'return_rejected': return 'error';
     case 'refund_pending': return 'warning';
     case 'refunded': return 'secondary';
     default: return 'default';
@@ -46,6 +52,9 @@ const getStatusLabel = (status: string) => {
     case 'cancelled': return 'Cancelled';
     case 'return_requested': return 'Return Requested';
     case 'return_approved': return 'Return Approved';
+    case 'return_shipping': return 'Return In Transit';
+    case 'return_received': return 'Return Received';
+    case 'return_rejected': return 'Return Rejected';
     case 'refund_pending': return 'Refund Pending';
     case 'refunded': return 'Refunded';
     default: return status;
@@ -60,6 +69,20 @@ const OrderDetailPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [cancelling, setCancelling] = useState(false);
+  
+  // Evidence upload state
+  const [photoFiles, setPhotoFiles] = useState<File[]>([]);
+  const [photoPreviews, setPhotoPreviews] = useState<string[]>([]);
+  const [uploadedPhotoUrls, setUploadedPhotoUrls] = useState<string[]>([]);
+  const [uploadingPhotos, setUploadingPhotos] = useState(false);
+  
+  const [videoFile, setVideoFile] = useState<File | null>(null);
+  const [videoPreview, setVideoPreview] = useState('');
+  const [uploadedVideoUrl, setUploadedVideoUrl] = useState('');
+  const [uploadingVideo, setUploadingVideo] = useState(false);
+  
+  const [description, setDescription] = useState('');
+  const [submittingEvidence, setSubmittingEvidence] = useState(false);
 
   useEffect(() => {
     if (orderId) {
@@ -94,6 +117,138 @@ const OrderDetailPage: React.FC = () => {
       alert(errorMsg);
     } finally {
       setCancelling(false);
+    }
+  };
+
+  const handlePhotoFilesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length + photoFiles.length > 5) {
+      alert('Maximum 5 photos allowed');
+      return;
+    }
+    
+    setPhotoFiles([...photoFiles, ...files]);
+    
+    // Create previews
+    files.forEach(file => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        setPhotoPreviews(prev => [...prev, reader.result as string]);
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleRemovePhoto = (index: number) => {
+    setPhotoFiles(photoFiles.filter((_, i) => i !== index));
+    setPhotoPreviews(photoPreviews.filter((_, i) => i !== index));
+    if (uploadedPhotoUrls[index]) {
+      setUploadedPhotoUrls(uploadedPhotoUrls.filter((_, i) => i !== index));
+    }
+  };
+
+  const handleUploadPhotos = async () => {
+    if (photoFiles.length === 0) return;
+
+    setUploadingPhotos(true);
+    const urls: string[] = [];
+
+    try {
+      for (const file of photoFiles) {
+        const formData = new FormData();
+        formData.append('file', file);
+
+        const response = await api.post('/upload/return-evidence', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+
+        urls.push(response.data.url);
+      }
+
+      setUploadedPhotoUrls(urls);
+      alert('Photos uploaded successfully!');
+    } catch (err: any) {
+      const errorMsg = err.response?.data?.detail || 'Failed to upload photos';
+      alert(errorMsg);
+    } finally {
+      setUploadingPhotos(false);
+    }
+  };
+
+  const handleVideoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file size (max 50MB)
+    if (file.size > 50 * 1024 * 1024) {
+      alert('Video file size must be less than 50MB');
+      return;
+    }
+
+    setVideoFile(file);
+    setVideoPreview(URL.createObjectURL(file));
+  };
+
+  const handleUploadVideo = async () => {
+    if (!videoFile) return;
+
+    setUploadingVideo(true);
+
+    try {
+      const formData = new FormData();
+      formData.append('file', videoFile);
+
+      const response = await api.post('/upload/return-evidence', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+
+      setUploadedVideoUrl(response.data.url);
+      alert('Video uploaded successfully!');
+    } catch (err: any) {
+      const errorMsg = err.response?.data?.detail || 'Failed to upload video';
+      alert(errorMsg);
+    } finally {
+      setUploadingVideo(false);
+    }
+  };
+
+  const handleSubmitEvidence = async () => {
+    if (!order) return;
+
+    // Validate
+    if (uploadedPhotoUrls.length === 0) {
+      alert('Please upload at least 1 photo');
+      return;
+    }
+    if (!description.trim()) {
+      alert('Please provide a description of the product condition');
+      return;
+    }
+
+    setSubmittingEvidence(true);
+    try {
+      const updatedOrder = await orderService.userConfirmShipped(order.id, {
+        photos: uploadedPhotoUrls,
+        video: uploadedVideoUrl || undefined,
+        description: description.trim(),
+      });
+      
+      setOrder(updatedOrder);
+      alert('Evidence submitted successfully! Your return is now in transit.');
+      
+      // Clear form
+      setPhotoFiles([]);
+      setPhotoPreviews([]);
+      setUploadedPhotoUrls([]);
+      setVideoFile(null);
+      setVideoPreview('');
+      setUploadedVideoUrl('');
+      setDescription('');
+    } catch (err: any) {
+      const errorMsg = err.response?.data?.detail || 'Failed to submit evidence';
+      alert(errorMsg);
+    } finally {
+      setSubmittingEvidence(false);
     }
   };
 
@@ -336,8 +491,180 @@ const OrderDetailPage: React.FC = () => {
             )}
             
             {order.status === 'return_approved' && (
-              <Alert severity="success" sx={{ mt: 2 }}>
-                Return approved! Refund is being processed.
+              <>
+                <Alert severity="success" sx={{ mt: 2 }}>
+                  Return approved by admin! Please upload photos/video of the product and confirm shipment to proceed with the return.
+                </Alert>
+                
+                {/* Evidence Upload Form */}
+                <Paper sx={{ mt: 2, p: 3, bgcolor: 'grey.50' }}>
+                  <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
+                    Upload Product Evidence
+                  </Typography>
+                  <Divider sx={{ mb: 3 }} />
+                  
+                  {/* Product Photos */}
+                  <Box sx={{ mb: 3 }}>
+                    <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1 }}>
+                      Product Photos (1-5 required) *
+                    </Typography>
+                    
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp,image/gif"
+                      multiple
+                      onChange={handlePhotoFilesChange}
+                      style={{ marginBottom: '16px', display: 'block' }}
+                    />
+
+                    {photoFiles.length > 0 && uploadedPhotoUrls.length === 0 && (
+                      <Button
+                        variant="contained"
+                        onClick={handleUploadPhotos}
+                        disabled={uploadingPhotos}
+                        sx={{ mb: 2 }}
+                      >
+                        {uploadingPhotos ? <CircularProgress size={24} /> : 'Upload Photos'}
+                      </Button>
+                    )}
+
+                    {uploadedPhotoUrls.length > 0 && (
+                      <Alert severity="success" sx={{ mb: 2 }}>
+                        {uploadedPhotoUrls.length} photo(s) uploaded successfully!
+                      </Alert>
+                    )}
+
+                    {/* Photo Previews */}
+                    {photoPreviews.length > 0 && (
+                      <Grid container spacing={2}>
+                        {photoPreviews.map((preview, index) => (
+                          <Grid item xs={6} sm={4} key={index}>
+                            <Box sx={{ position: 'relative' }}>
+                              <Box
+                                component="img"
+                                src={preview}
+                                alt={`Preview ${index + 1}`}
+                                sx={{
+                                  width: '100%',
+                                  height: 150,
+                                  objectFit: 'cover',
+                                  borderRadius: 1,
+                                  border: '1px solid #ddd',
+                                }}
+                              />
+                              <Button
+                                size="small"
+                                color="error"
+                                onClick={() => handleRemovePhoto(index)}
+                                sx={{
+                                  position: 'absolute',
+                                  top: 4,
+                                  right: 4,
+                                  minWidth: 'auto',
+                                  bgcolor: 'white',
+                                  '&:hover': { bgcolor: 'error.light', color: 'white' },
+                                }}
+                              >
+                                <DeleteIcon fontSize="small" />
+                              </Button>
+                            </Box>
+                          </Grid>
+                        ))}
+                      </Grid>
+                    )}
+                  </Box>
+                  
+                  {/* Product Video */}
+                  <Box sx={{ mb: 3 }}>
+                    <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1 }}>
+                      Product Video (optional)
+                    </Typography>
+                    
+                    <input
+                      type="file"
+                      accept="video/mp4,video/webm,video/quicktime"
+                      onChange={handleVideoFileChange}
+                      style={{ marginBottom: '16px', display: 'block' }}
+                    />
+
+                    {videoFile && !uploadedVideoUrl && (
+                      <Button
+                        variant="contained"
+                        onClick={handleUploadVideo}
+                        disabled={uploadingVideo}
+                        sx={{ mb: 2 }}
+                      >
+                        {uploadingVideo ? <CircularProgress size={24} /> : 'Upload Video'}
+                      </Button>
+                    )}
+
+                    {uploadedVideoUrl && (
+                      <Alert severity="success" sx={{ mb: 2 }}>
+                        Video uploaded successfully!
+                      </Alert>
+                    )}
+
+                    {/* Video Preview */}
+                    {videoPreview && (
+                      <Box
+                        component="video"
+                        src={videoPreview}
+                        controls
+                        sx={{
+                          width: '100%',
+                          maxHeight: 300,
+                          borderRadius: 1,
+                          border: '1px solid #ddd',
+                        }}
+                      />
+                    )}
+                  </Box>
+                  
+                  {/* Description */}
+                  <Box sx={{ mb: 3 }}>
+                    <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1 }}>
+                      Product Condition *
+                    </Typography>
+                    <TextField
+                      fullWidth
+                      multiline
+                      rows={4}
+                      placeholder="Describe the product condition, any defects, damages, etc."
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                    />
+                  </Box>
+                  
+                  {/* Submit Button */}
+                  <Button
+                    variant="contained"
+                    color="primary"
+                    size="large"
+                    fullWidth
+                    onClick={handleSubmitEvidence}
+                    disabled={submittingEvidence || uploadedPhotoUrls.length === 0 || !description.trim()}
+                  >
+                    {submittingEvidence ? 'Submitting...' : 'Confirm Shipment & Submit Evidence'}
+                  </Button>
+                </Paper>
+              </>
+            )}
+            
+            {order.status === 'return_shipping' && (
+              <Alert severity="info" sx={{ mt: 2 }}>
+                Your return shipment is in transit. Admin will confirm receipt and inspect the product before processing your refund.
+              </Alert>
+            )}
+            
+            {order.status === 'return_received' && (
+              <Alert severity="info" sx={{ mt: 2 }}>
+                Admin has received your return and is performing quality check. Refund will be processed once QC is approved.
+              </Alert>
+            )}
+            
+            {order.status === 'return_rejected' && order.qc_notes && (
+              <Alert severity="error" sx={{ mt: 2 }}>
+                <strong>Return Rejected:</strong> {order.qc_notes}
               </Alert>
             )}
             

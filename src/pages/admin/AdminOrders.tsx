@@ -51,6 +51,9 @@ const ORDER_STATUSES = [
   { value: "cancelled", label: "Cancelled", color: "error" },
   { value: "return_requested", label: "Return Requested", color: "warning" },
   { value: "return_approved", label: "Return Approved", color: "info" },
+  { value: "return_shipping", label: "Return In Transit", color: "primary" },
+  { value: "return_received", label: "Return Received", color: "info" },
+  { value: "return_rejected", label: "Return Rejected", color: "error" },
   { value: "refund_pending", label: "Refund Pending", color: "warning" },
   { value: "refunded", label: "Refunded", color: "secondary" },
 ] as const;

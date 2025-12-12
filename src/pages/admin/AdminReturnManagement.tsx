@@ -21,6 +21,8 @@ import {
   TextField,
   IconButton,
   Tooltip,
+  Tabs,
+  Tab,
 } from '@mui/material';
 import {
   CheckCircle as ApproveIcon,
@@ -30,9 +32,10 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { useCurrency } from '../../context/CurrencyContext';
 import {
-  adminGetPendingReturns,
+  adminGetOrders,
   adminApproveReturn,
   adminRejectReturn,
+  adminConfirmReceived,
   IAdminOrderListItem,
 } from '../../services/Order';
 
@@ -43,6 +46,7 @@ const AdminReturnManagement: React.FC = () => {
   const [returns, setReturns] = useState<IAdminOrderListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState<number | null>(null);
+  const [currentTab, setCurrentTab] = useState(0); // 0: Pending, 1: In Transit
   
   // Reject dialog
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
@@ -50,33 +54,61 @@ const AdminReturnManagement: React.FC = () => {
   const [rejectionReason, setRejectionReason] = useState('');
 
   useEffect(() => {
-    fetchPendingReturns();
-  }, []);
+    fetchReturns();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentTab]);
 
-  const fetchPendingReturns = async () => {
+  const getStatusForTab = () => {
+    switch (currentTab) {
+      case 0: return 'return_requested';
+      case 1: return 'return_shipping';
+      default: return 'return_requested';
+    }
+  };
+
+  const fetchReturns = async () => {
     try {
       setLoading(true);
-      const data = await adminGetPendingReturns(1, 100);
+      const status = getStatusForTab();
+      const data = await adminGetOrders(1, 100, status);
       setReturns(data.orders);
     } catch (error) {
-      console.error('Failed to fetch pending returns:', error);
+      console.error('Failed to fetch returns:', error);
     } finally {
       setLoading(false);
     }
   };
 
   const handleApprove = async (orderId: number) => {
-    if (!window.confirm('Approve this return request and initiate refund?')) {
+    if (!window.confirm('Approve this return request? User will be able to upload evidence and ship the product.')) {
       return;
     }
 
     setProcessing(orderId);
     try {
       await adminApproveReturn(orderId);
-      alert('Return approved! Refund initiated successfully.');
-      fetchPendingReturns(); // Refresh list
+      alert('Return approved! Waiting for user to upload evidence and ship.');
+      fetchReturns(); // Refresh list
     } catch (error: any) {
       const errorMsg = error.response?.data?.detail || 'Failed to approve return';
+      alert(`Error: ${errorMsg}`);
+    } finally {
+      setProcessing(null);
+    }
+  };
+
+  const handleConfirmReceived = async (orderId: number) => {
+    if (!window.confirm('Confirm product received? This will automatically trigger the refund (subtotal only, no shipping fee).')) {
+      return;
+    }
+
+    setProcessing(orderId);
+    try {
+      await adminConfirmReceived(orderId);
+      alert('Product received! Refund has been initiated automatically.');
+      fetchReturns(); // Refresh list
+    } catch (error: any) {
+      const errorMsg = error.response?.data?.detail || 'Failed to confirm receipt';
       alert(`Error: ${errorMsg}`);
     } finally {
       setProcessing(null);
@@ -95,11 +127,12 @@ const AdminReturnManagement: React.FC = () => {
     try {
       await adminRejectReturn(selectedOrderId, rejectionReason);
       alert('Return request rejected.');
+      
       setRejectDialogOpen(false);
       setRejectionReason('');
-      fetchPendingReturns(); // Refresh list
+      fetchReturns(); // Refresh list
     } catch (error: any) {
-      const errorMsg = error.response?.data?.detail || 'Failed to reject return';
+      const errorMsg = error.response?.data?.detail || 'Failed to reject';
       alert(`Error: ${errorMsg}`);
     } finally {
       setProcessing(null);
@@ -142,6 +175,14 @@ const AdminReturnManagement: React.FC = () => {
         </Typography>
       </Box>
 
+      {/* Tabs */}
+      <Paper sx={{ mb: 3 }}>
+        <Tabs value={currentTab} onChange={(_, newValue) => setCurrentTab(newValue)}>
+          <Tab label="Pending Approval" />
+          <Tab label="In Transit" />
+        </Tabs>
+      </Paper>
+
       {/* Stats */}
       <Box sx={{ mb: 3, display: 'flex', gap: 2 }}>
         <Paper sx={{ p: 2, flex: 1 }}>
@@ -149,7 +190,7 @@ const AdminReturnManagement: React.FC = () => {
             {returns.length}
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Pending Returns
+            {currentTab === 0 ? 'Pending Returns' : 'In Transit'}
           </Typography>
         </Paper>
       </Box>
@@ -228,31 +269,53 @@ const AdminReturnManagement: React.FC = () => {
                           </IconButton>
                         </Tooltip>
                         
-                        <Tooltip title="Approve Return">
-                          <span>
-                            <IconButton
-                              size="small"
-                              color="success"
-                              onClick={() => handleApprove(order.id)}
-                              disabled={isProcessing}
-                            >
-                              <ApproveIcon fontSize="small" />
-                            </IconButton>
-                          </span>
-                        </Tooltip>
-                        
-                        <Tooltip title="Reject Return">
-                          <span>
-                            <IconButton
-                              size="small"
-                              color="error"
-                              onClick={() => handleRejectClick(order.id)}
-                              disabled={isProcessing}
-                            >
-                              <RejectIcon fontSize="small" />
-                            </IconButton>
-                          </span>
-                        </Tooltip>
+                        {/* Pending Tab - Approve/Reject Return Request */}
+                        {currentTab === 0 && (
+                          <>
+                            <Tooltip title="Approve Return">
+                              <span>
+                                <IconButton
+                                  size="small"
+                                  color="success"
+                                  onClick={() => handleApprove(order.id)}
+                                  disabled={isProcessing}
+                                >
+                                  <ApproveIcon fontSize="small" />
+                                </IconButton>
+                              </span>
+                            </Tooltip>
+                            
+                            <Tooltip title="Reject Return">
+                              <span>
+                                <IconButton
+                                  size="small"
+                                  color="error"
+                                  onClick={() => handleRejectClick(order.id)}
+                                  disabled={isProcessing}
+                                >
+                                  <RejectIcon fontSize="small" />
+                                </IconButton>
+                              </span>
+                            </Tooltip>
+                          </>
+                        )}
+
+                        {/* In Transit Tab - Confirm Receipt & Auto Refund */}
+                        {currentTab === 1 && (
+                          <Tooltip title="Confirm Receipt & Trigger Refund">
+                            <span>
+                              <Button
+                                size="small"
+                                variant="contained"
+                                color="primary"
+                                onClick={() => handleConfirmReceived(order.id)}
+                                disabled={isProcessing}
+                              >
+                                Confirm Receipt
+                              </Button>
+                            </span>
+                          </Tooltip>
+                        )}
                       </Box>
                     </TableCell>
                   </TableRow>

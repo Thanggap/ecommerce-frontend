@@ -47,6 +47,16 @@ export interface IOrder {
   // Return tracking
   return_requested_at?: string;
   
+  // Return evidence (NEW)
+  return_evidence_photos?: string[];
+  return_evidence_video?: string;
+  return_evidence_description?: string;
+  return_shipping_provider?: string;
+  return_tracking_number?: string;
+  return_shipped_at?: string;
+  return_received_at?: string;
+  qc_notes?: string;
+  
   items: IOrderItem[];
   created_at: string;
   updated_at: string;
@@ -81,6 +91,26 @@ export const getOrderDetail = async (orderId: number): Promise<IOrder> => {
 // Cancel order (user can cancel if status is Pending or Confirmed)
 export const cancelOrder = async (orderId: number): Promise<IOrder> => {
   const response = await api.post(`/orders/${orderId}/cancel`);
+  return response.data;
+};
+
+// User: Confirm shipped return with evidence
+export interface IReturnEvidenceRequest {
+  photos: string[];
+  video?: string;
+  description: string;
+  shipping_provider?: string;
+  tracking_number?: string;
+}
+
+export const userConfirmShipped = async (orderId: number, evidence: IReturnEvidenceRequest): Promise<IOrder> => {
+  const response = await api.post(`/orders/${orderId}/return/ship`, {
+    evidence_photos: evidence.photos,
+    evidence_description: evidence.description,
+    evidence_video: evidence.video,
+    shipping_provider: evidence.shipping_provider,
+    tracking_number: evidence.tracking_number,
+  });
   return response.data;
 };
 
@@ -158,18 +188,42 @@ export const adminRejectReturn = async (orderId: number, rejectionReason?: strin
   return response.data;
 };
 
+// Admin: Confirm product received
+export const adminConfirmReceived = async (orderId: number, qcNotes?: string): Promise<IOrder> => {
+  const response = await api.post(`/admin/orders/${orderId}/return/receive`, { 
+    qc_notes: qcNotes || null 
+  });
+  return response.data;
+};
+
+// Admin: Confirm refund after QC
+export const adminConfirmRefund = async (orderId: number, refundAmount?: number): Promise<IOrder> => {
+  const response = await api.post(`/admin/orders/${orderId}/return/refund`, { refund_amount: refundAmount });
+  return response.data;
+};
+
+// Admin: Reject QC check
+export const adminRejectQC = async (orderId: number, reason: string): Promise<IOrder> => {
+  const response = await api.post(`/admin/orders/${orderId}/return/reject-qc`, { reason });
+  return response.data;
+};
+
 // Export as service object for convenience
 export const orderService = {
   createOrder,
   getMyOrders,
   getOrderDetail,
   cancelOrder,
+  userConfirmShipped,
   adminGetOrders,
   adminGetOrderDetail,
   adminUpdateOrderStatus,
   adminGetPendingReturns,
   adminApproveReturn,
   adminRejectReturn,
+  adminConfirmReceived,
+  adminConfirmRefund,
+  adminRejectQC,
 };
 
 export default orderService;
