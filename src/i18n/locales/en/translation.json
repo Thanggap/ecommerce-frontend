@@ -17,7 +17,8 @@
     "yes": "Yes",
     "no": "No",
     "confirm": "Confirm",
-    "close": "Close"
+    "close": "Close",
+    "refresh": "Refresh"
   },
   "nav": {
     "home": "Home",
@@ -79,13 +80,19 @@
     "promoted_to_admin": "Promoted to admin",
     "demoted_to_user": "Demoted to user",
     "cannot_demote_self": "Cannot demote yourself",
-    "manage_users": "Manage Users",
+    "manage_users": "User Management",
     "role": "Role",
     "status": "Status",
     "active": "Active",
     "inactive": "Inactive",
     "promote": "Promote to Admin",
-    "demote": "Demote to User"
+    "demote": "Demote to User",
+    "full_name": "Full Name",
+    "actions": "Actions",
+    "you": "You",
+    "fetch_error": "Failed to load users",
+    "promote_error": "Failed to promote user",
+    "demote_error": "Failed to demote user"
   },
   "product": {
     "title": "Products",
@@ -202,7 +209,10 @@
     "orders": "Orders",
     "analytics": "Analytics",
     "add_product": "Add Product",
-    "edit_product": "Edit Product"
+    "edit_product": "Edit Product",
+    "manage_products": "Manage Products",
+    "manage_orders": "Manage Orders",
+    "return_requests": "Return Requests"
   },
   "profile": {
     "title": "Account Information",

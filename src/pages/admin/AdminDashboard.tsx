@@ -16,17 +16,31 @@ import {
   Box,
 } from "@mui/material";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useAuth } from "../../context/AuthContext";
 import { getAllUsers, promoteUser, demoteUser } from "../../services/User";
 import { IUser, getUserId } from "../../types/AuthTypes";
 
 export default function AdminDashboard() {
+  const { t } = useTranslation();
   const [users, setUsers] = useState<IUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const { user, isLoggedIn } = useAuth();
   const navigate = useNavigate();
+
+  const fetchUsers = React.useCallback(async () => {
+    try {
+      setLoading(true);
+      const data = await getAllUsers();
+      setUsers(data);
+    } catch (err: any) {
+      setError(err.response?.data?.detail || t("user.fetch_error", "Failed to load users"));
+    } finally {
+      setLoading(false);
+    }
+  }, [t]);
 
   useEffect(() => {
     // Check quyen admin
@@ -40,29 +54,17 @@ export default function AdminDashboard() {
     }
 
     fetchUsers();
-  }, [isLoggedIn, user, navigate]);
-
-  const fetchUsers = async () => {
-    try {
-      setLoading(true);
-      const data = await getAllUsers();
-      setUsers(data);
-    } catch (err: any) {
-      setError(err.response?.data?.detail || "Khong the tai danh sach user");
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [isLoggedIn, user, navigate, fetchUsers]);
 
   const handlePromote = async (userId: string) => {
     try {
       setError("");
       setSuccess("");
       await promoteUser(userId);
-      setSuccess("Da nang cap user thanh admin!");
+      setSuccess(t("user.promoted_to_admin", "User promoted to admin successfully!"));
       fetchUsers();
     } catch (err: any) {
-      setError(err.response?.data?.detail || "Khong the nang cap user");
+      setError(err.response?.data?.detail || t("user.promote_error", "Failed to promote user"));
     }
   };
 
@@ -71,10 +73,10 @@ export default function AdminDashboard() {
       setError("");
       setSuccess("");
       await demoteUser(userId);
-      setSuccess("Da ha cap admin thanh user!");
+      setSuccess(t("user.demoted_to_user", "Admin demoted to user successfully!"));
       fetchUsers();
     } catch (err: any) {
-      setError(err.response?.data?.detail || "Khong the ha cap user");
+      setError(err.response?.data?.detail || t("user.demote_error", "Failed to demote user"));
     }
   };
 
@@ -89,24 +91,24 @@ export default function AdminDashboard() {
   return (
     <Container sx={{ py: 4 }}>
       <Typography variant="h4" gutterBottom>
-        Admin Dashboard
+        {t("admin.dashboard", "Admin Dashboard")}
       </Typography>
 
       {/* Quick Links */}
       <Box sx={{ display: "flex", gap: 2, mb: 4 }}>
         <Button variant="contained" onClick={() => navigate("/admin/products")}>
-          Manage Products
+          {t("admin.manage_products", "Manage Products")}
         </Button>
         <Button variant="contained" onClick={() => navigate("/admin/orders")}>
-          Manage Orders
+          {t("admin.manage_orders", "Manage Orders")}
         </Button>
         <Button variant="contained" color="warning" onClick={() => navigate("/admin/returns")}>
-          Return Requests
+          {t("admin.return_requests", "Return Requests")}
         </Button>
       </Box>
 
       <Typography variant="h5" gutterBottom>
-        User Management
+        {t("user.manage_users", "User Management")}
       </Typography>
 
       {error && (
@@ -120,32 +122,26 @@ export default function AdminDashboard() {
         </Alert>
       )}
 
-      <Box sx={{ mb: 3 }}>
-        <Button variant="contained" href="/admin/products" sx={{ mr: 2 }}>
-          Quan ly san pham
-        </Button>
-        <Button variant="contained" href="/admin/add-product" sx={{ mr: 2 }}>
-          Them san pham
-        </Button>
+      <Box sx={{ mb: 3, display: "flex", gap: 2 }}>
         <Button variant="outlined" onClick={fetchUsers}>
-          Lam moi
+          {t("common.refresh", "Refresh")}
         </Button>
       </Box>
 
-      <TableContainer component={Paper}>
+      <TableContainer component={Paper} sx={{ boxShadow: 3 }}>
         <Table>
-          <TableHead>
+          <TableHead sx={{ bgcolor: "#f5f5f5" }}>
             <TableRow>
-              <TableCell>Email</TableCell>
-              <TableCell>Ho ten</TableCell>
-              <TableCell>Role</TableCell>
-              <TableCell>Trang thai</TableCell>
-              <TableCell>Hanh dong</TableCell>
+              <TableCell sx={{ fontWeight: 600 }}>{t("auth.email", "Email")}</TableCell>
+              <TableCell sx={{ fontWeight: 600 }}>{t("user.full_name", "Full Name")}</TableCell>
+              <TableCell sx={{ fontWeight: 600 }}>{t("user.role", "Role")}</TableCell>
+              <TableCell sx={{ fontWeight: 600 }}>{t("user.status", "Status")}</TableCell>
+              <TableCell sx={{ fontWeight: 600 }}>{t("user.actions", "Actions")}</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {users.map((u) => (
-              <TableRow key={getUserId(u)}>
+              <TableRow key={getUserId(u)} hover>
                 <TableCell>{u.email}</TableCell>
                 <TableCell>
                   {u.first_name || u.last_name
@@ -154,14 +150,14 @@ export default function AdminDashboard() {
                 </TableCell>
                 <TableCell>
                   <Chip
-                    label={u.role}
+                    label={u.role.toUpperCase()}
                     color={u.role === "admin" ? "primary" : "default"}
                     size="small"
                   />
                 </TableCell>
                 <TableCell>
                   <Chip
-                    label={u.is_active ? "Active" : "Inactive"}
+                    label={u.is_active ? t("user.active", "Active") : t("user.inactive", "Inactive")}
                     color={u.is_active ? "success" : "error"}
                     size="small"
                   />
@@ -174,7 +170,7 @@ export default function AdminDashboard() {
                       color="primary"
                       onClick={() => handlePromote(getUserId(u))}
                     >
-                      Nang cap Admin
+                      {t("user.promote", "Promote to Admin")}
                     </Button>
                   ) : getUserId(u) !== getUserId(user as IUser) ? (
                     <Button
@@ -183,10 +179,10 @@ export default function AdminDashboard() {
                       color="warning"
                       onClick={() => handleDemote(getUserId(u))}
                     >
-                      Ha cap User
+                      {t("user.demote", "Demote to User")}
                     </Button>
                   ) : (
-                    <Chip label="Ban" size="small" />
+                    <Chip label={t("user.you", "You")} size="small" color="info" />
                   )}
                 </TableCell>
               </TableRow>
