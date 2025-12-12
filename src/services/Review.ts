@@ -11,6 +11,8 @@ export interface IReview {
   product_id: number;
   content: string;
   rating: number;
+  images?: string[];  // Array of image URLs
+  video?: string;     // Video URL
   created_at: string;
   author: IReviewAuthor;
 }

@@ -89,8 +89,35 @@ export const getOrderDetail = async (orderId: number): Promise<IOrder> => {
 };
 
 // Cancel order (user can cancel if status is Pending or Confirmed)
-export const cancelOrder = async (orderId: number): Promise<IOrder> => {
-  const response = await api.post(`/orders/${orderId}/cancel`);
+// Or request return for delivered orders (with optional evidence)
+export interface IReturnRequestData {
+  reason?: string;
+  evidence_photos?: string[];
+  evidence_video?: string;
+  evidence_description?: string;
+}
+
+export const cancelOrder = async (orderId: number, returnData?: IReturnRequestData): Promise<IOrder> => {
+  const response = await api.post(`/orders/${orderId}/cancel`, returnData || {});
+  return response.data;
+};
+
+// User: Confirm delivery (received order)
+export const userConfirmDelivery = async (orderId: number): Promise<{ message: string; order_id: number; status: string; delivered_at: string }> => {
+  const response = await api.post(`/orders/${orderId}/confirm-delivery`);
+  return response.data;
+};
+
+// User: Submit review for delivered order
+export interface IReviewRequest {
+  rating: number; // 1-5 stars
+  comment: string;
+  images?: string[];
+  video?: string;
+}
+
+export const userSubmitReview = async (orderId: number, review: IReviewRequest): Promise<{ message: string; review_id: number }> => {
+  const response = await api.post(`/orders/${orderId}/review`, review);
   return response.data;
 };
 
@@ -129,6 +156,13 @@ export interface IAdminOrderListItem {
   items_count: number;
   created_at: string;
   updated_at: string;
+  
+  // Return evidence (for admin view)
+  return_evidence_photos?: string[];
+  return_evidence_video?: string;
+  return_evidence_description?: string;
+  return_shipping_provider?: string;
+  return_tracking_number?: string;
 }
 
 export interface IAdminOrdersResponse {
@@ -214,6 +248,8 @@ export const orderService = {
   getMyOrders,
   getOrderDetail,
   cancelOrder,
+  userConfirmDelivery,
+  userSubmitReview,
   userConfirmShipped,
   adminGetOrders,
   adminGetOrderDetail,

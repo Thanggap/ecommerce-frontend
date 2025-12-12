@@ -3,9 +3,8 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
 import { getProductInfo } from "../../services/Product";
-import { getProductReviews, createProductReview, IReviewListResponse, ICreateReview } from "../../services/Review";
+import { getProductReviews, IReviewListResponse } from "../../services/Review";
 import { useCurrency } from "../../context/CurrencyContext";
-import { useAuth } from "../../context/AuthContext";
 
 import AddToCart from "../../components/ui/buttons/AddToCart/AddToCart";
 import RadioProduct from "../../components/ui/buttons/RadioProduct/RadioProduct";
@@ -13,7 +12,6 @@ import FDADisclaimer from "../../components/shared/FDADisclaimer";
 
 import {
   Typography,
-  TextField,
   Button,
   Box,
   Paper,
@@ -28,13 +26,11 @@ import {
   Tab,
   Avatar,
   Alert,
-  CircularProgress,
 } from "@mui/material";
 import {
   Home,
   FavoriteBorder,
   Share,
-  LocalShipping,
   Verified,
   Loop,
   Security,
@@ -48,7 +44,6 @@ export default function ProductPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { formatPrice } = useCurrency();
-  const { isLoggedIn } = useAuth();
   const [productInfo, setProductInfo] = useState<Product>();
   const [color, setColor] = useState<string>("");
   const [size, setSize] = useState<string>("");
@@ -56,13 +51,8 @@ export default function ProductPage() {
   const [selectedImage, setSelectedImage] = useState<number>(0);
   const [tabValue, setTabValue] = useState(0);
   
-  // Review states
+  // Review state
   const [reviews, setReviews] = useState<IReviewListResponse | null>(null);
-  const [reviewRating, setReviewRating] = useState<number>(5);
-  const [reviewContent, setReviewContent] = useState<string>("");
-  const [submittingReview, setSubmittingReview] = useState<boolean>(false);
-  const [reviewError, setReviewError] = useState<string>("");
-  const [reviewSuccess, setReviewSuccess] = useState<boolean>(false);
 
   // Get product images: main image + color images
   const productImages = React.useMemo(() => {
@@ -124,53 +114,6 @@ export default function ProductPage() {
       }
     }
   }, [color, productInfo]);
-
-  // Handle review submission
-  const handleSubmitReview = async () => {
-    if (!isLoggedIn) {
-      setReviewError("Please login to submit a review");
-      return;
-    }
-
-    if (!reviewContent.trim()) {
-      setReviewError("Please write a review");
-      return;
-    }
-
-    if (!productInfo?.slug) return;
-
-    setSubmittingReview(true);
-    setReviewError("");
-    setReviewSuccess(false);
-
-    try {
-      const newReview: ICreateReview = {
-        content: reviewContent,
-        rating: reviewRating,
-      };
-
-      await createProductReview(productInfo.slug, newReview);
-
-      // Refresh reviews
-      const reviewData = await getProductReviews(productInfo.slug);
-      setReviews(reviewData);
-
-      // Reset form
-      setReviewContent("");
-      setReviewRating(5);
-      setReviewSuccess(true);
-
-      // Clear success message after 3s
-      setTimeout(() => setReviewSuccess(false), 3000);
-    } catch (err: any) {
-      // Try to get translated error message
-      const errorDetail = err.message || "Failed to submit review";
-      const translatedError = t(errorDetail, { defaultValue: errorDetail });
-      setReviewError(translatedError);
-    } finally {
-      setSubmittingReview(false);
-    }
-  };
 
   const discountPercent = productInfo?.sale_price
     ? Math.round(((productInfo.price - productInfo.sale_price) / productInfo.price) * 100)
@@ -307,17 +250,30 @@ export default function ProductPage() {
                   </Typography>
 
                   <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 2 }}>
-                    <Rating value={4.5} precision={0.5} readOnly />
-                    <Typography variant="body2" color="text.secondary">
-                      (128 {t("review.title")})
-                    </Typography>
-                    <Chip
-                      icon={<Verified sx={{ fontSize: 16 }} />}
-                      label={t("product.in_stock")}
-                      color="success"
-                      size="small"
-                      variant="outlined"
+                    <Rating 
+                      value={reviews?.average_rating || 0} 
+                      precision={0.1} 
+                      readOnly 
                     />
+                    <Typography variant="body2" color="text.secondary">
+                      ({reviews?.total_reviews || 0} {t("review.title")})
+                    </Typography>
+                    {productInfo.stock > 0 ? (
+                      <Chip
+                        icon={<Verified sx={{ fontSize: 16 }} />}
+                        label={`${t("product.in_stock")} (${productInfo.stock})`}
+                        color="success"
+                        size="small"
+                        variant="outlined"
+                      />
+                    ) : (
+                      <Chip
+                        label={t("product.out_of_stock")}
+                        color="error"
+                        size="small"
+                        variant="outlined"
+                      />
+                    )}
                   </Box>
 
                   {/* Price */}
@@ -451,7 +407,7 @@ export default function ProductPage() {
                   {productInfo.sizes && productInfo.sizes.length > 0 && (
                     <Box sx={{ mb: 3 }}>
                       <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1.5 }}>
-                        {t("product.size")}: <span style={{ fontWeight: 400 }}>{size.toUpperCase()}</span>
+                        {t("product.size")}: <span style={{ fontWeight: 400 }}>{size ? size.toUpperCase() : ''}</span>
                       </Typography>
                       <RadioProduct 
                         value={productInfo.sizes.map(s => s.size)} 
@@ -470,12 +426,8 @@ export default function ProductPage() {
                   {/* Trust badges */}
                   <Box sx={{ display: "flex", gap: 3, flexWrap: "wrap" }}>
                     <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                      <LocalShipping color="primary" />
-                      <Typography variant="body2">{t("general.free_shipping")}</Typography>
-                    </Box>
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                       <Loop color="primary" />
-                      <Typography variant="body2">30-Day Returns</Typography>
+                      <Typography variant="body2">7-Day Returns</Typography>
                     </Box>
                     <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                       <Security color="primary" />
@@ -557,55 +509,8 @@ export default function ProductPage() {
 
                 {tabValue === 1 && (
                   <Box>
-                    {/* Review Form */}
-                    <Box sx={{ mb: 4 }}>
-                      <Typography variant="h6" fontWeight={600} gutterBottom>
-                        {t("review.write_review")}
-                      </Typography>
-                      
-                      {reviewSuccess && (
-                        <Alert severity="success" sx={{ mb: 2 }}>
-                          Review submitted successfully!
-                        </Alert>
-                      )}
-                      
-                      {reviewError && (
-                        <Alert severity="error" sx={{ mb: 2 }}>
-                          {reviewError}
-                        </Alert>
-                      )}
-                      
-                      <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 2 }}>
-                        <Typography>{t("review.rating")}:</Typography>
-                        <Rating 
-                          size="large" 
-                          value={reviewRating}
-                          onChange={(_, newValue) => setReviewRating(newValue || 5)}
-                        />
-                      </Box>
-                      <TextField
-                        multiline
-                        rows={4}
-                        placeholder={t("review.comment")}
-                        fullWidth
-                        value={reviewContent}
-                        onChange={(e) => setReviewContent(e.target.value)}
-                        sx={{ mb: 2 }}
-                      />
-                      <Button 
-                        variant="contained" 
-                        sx={{ textTransform: "none" }}
-                        onClick={handleSubmitReview}
-                        disabled={submittingReview || !reviewContent.trim()}
-                      >
-                        {submittingReview ? <CircularProgress size={24} /> : t("common.submit")}
-                      </Button>
-                    </Box>
-
-                    <Divider sx={{ my: 3 }} />
-
                     {/* Reviews List */}
-                    <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
+                    <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3 }}>
                       <Typography variant="h6" fontWeight={600}>
                         Customer Reviews
                       </Typography>
@@ -636,9 +541,49 @@ export default function ProductPage() {
                                 </Typography>
                               </Box>
                               <Rating value={review.rating} size="small" readOnly sx={{ mb: 1 }} />
-                              <Typography color="text.secondary">
+                              <Typography color="text.secondary" sx={{ mb: 2 }}>
                                 {review.content}
                               </Typography>
+                              
+                              {/* Review Images */}
+                              {review.images && review.images.length > 0 && (
+                                <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 1 }}>
+                                  {review.images.map((imageUrl, idx) => (
+                                    <Box
+                                      key={idx}
+                                      component="img"
+                                      src={imageUrl}
+                                      alt={`Review image ${idx + 1}`}
+                                      sx={{
+                                        width: 100,
+                                        height: 100,
+                                        objectFit: 'cover',
+                                        borderRadius: 1,
+                                        cursor: 'pointer',
+                                        border: '1px solid #ddd',
+                                        '&:hover': { opacity: 0.8 }
+                                      }}
+                                      onClick={() => window.open(imageUrl, '_blank')}
+                                    />
+                                  ))}
+                                </Box>
+                              )}
+                              
+                              {/* Review Video */}
+                              {review.video && (
+                                <Box sx={{ mt: 1, maxWidth: 400 }}>
+                                  <video
+                                    src={review.video}
+                                    controls
+                                    style={{
+                                      width: '100%',
+                                      maxHeight: '250px',
+                                      borderRadius: '8px',
+                                      border: '1px solid #ddd'
+                                    }}
+                                  />
+                                </Box>
+                              )}
                             </Box>
                           </Box>
                         </Box>

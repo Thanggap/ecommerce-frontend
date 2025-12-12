@@ -29,7 +29,6 @@ import {
   Cancel as RejectIcon,
   Visibility as ViewIcon,
 } from '@mui/icons-material';
-import { useNavigate } from 'react-router-dom';
 import { useCurrency } from '../../context/CurrencyContext';
 import {
   adminGetOrders,
@@ -40,7 +39,6 @@ import {
 } from '../../services/Order';
 
 const AdminReturnManagement: React.FC = () => {
-  const navigate = useNavigate();
   const { formatPrice } = useCurrency();
   
   const [returns, setReturns] = useState<IAdminOrderListItem[]>([]);
@@ -52,6 +50,10 @@ const AdminReturnManagement: React.FC = () => {
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
   const [selectedOrderId, setSelectedOrderId] = useState<number | null>(null);
   const [rejectionReason, setRejectionReason] = useState('');
+
+  // Evidence dialog
+  const [evidenceDialogOpen, setEvidenceDialogOpen] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState<IAdminOrderListItem | null>(null);
 
   useEffect(() => {
     fetchReturns();
@@ -263,7 +265,10 @@ const AdminReturnManagement: React.FC = () => {
                         <Tooltip title="View Order">
                           <IconButton
                             size="small"
-                            onClick={() => navigate(`/admin/orders/${order.id}`)}
+                            onClick={() => {
+                              setSelectedOrder(order);
+                              setEvidenceDialogOpen(true);
+                            }}
                           >
                             <ViewIcon fontSize="small" />
                           </IconButton>
@@ -354,6 +359,115 @@ const AdminReturnManagement: React.FC = () => {
             disabled={!rejectionReason.trim() || processing !== null}
           >
             {processing ? 'Rejecting...' : 'Reject Return'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Evidence Dialog */}
+      <Dialog open={evidenceDialogOpen} onClose={() => setEvidenceDialogOpen(false)} maxWidth="md" fullWidth>
+        <DialogTitle>Return Evidence - Order #{selectedOrder?.id}</DialogTitle>
+        <DialogContent>
+          {selectedOrder && (
+            <Box sx={{ pt: 2 }}>
+              {/* Order Info */}
+              <Box sx={{ mb: 3 }}>
+                <Typography variant="subtitle2" color="text.secondary">Customer</Typography>
+                <Typography variant="body1">{selectedOrder.shipping_name}</Typography>
+                <Typography variant="body2" color="text.secondary">{selectedOrder.shipping_email}</Typography>
+              </Box>
+
+              {/* Evidence Photos */}
+              {selectedOrder.return_evidence_photos && selectedOrder.return_evidence_photos.length > 0 ? (
+                <Box sx={{ mb: 3 }}>
+                  <Typography variant="subtitle2" fontWeight="bold" gutterBottom>
+                    Product Photos ({selectedOrder.return_evidence_photos.length})
+                  </Typography>
+                  <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mt: 1 }}>
+                    {selectedOrder.return_evidence_photos.map((url, idx) => (
+                      <Box
+                        key={idx}
+                        component="img"
+                        src={url}
+                        alt={`Evidence ${idx + 1}`}
+                        sx={{
+                          width: 150,
+                          height: 150,
+                          objectFit: 'cover',
+                          borderRadius: 1,
+                          border: '1px solid #ddd',
+                          cursor: 'pointer',
+                        }}
+                        onClick={() => window.open(url, '_blank')}
+                      />
+                    ))}
+                  </Box>
+                </Box>
+              ) : (
+                <Alert severity="info" sx={{ mb: 2 }}>No photos uploaded yet</Alert>
+              )}
+
+              {/* Evidence Video */}
+              {selectedOrder.return_evidence_video && (
+                <Box sx={{ mb: 3 }}>
+                  <Typography variant="subtitle2" fontWeight="bold" gutterBottom>
+                    Product Video
+                  </Typography>
+                  <Box
+                    component="video"
+                    src={selectedOrder.return_evidence_video}
+                    controls
+                    sx={{
+                      width: '100%',
+                      maxHeight: 300,
+                      borderRadius: 1,
+                      border: '1px solid #ddd',
+                    }}
+                  />
+                </Box>
+              )}
+
+              {/* Description */}
+              {selectedOrder.return_evidence_description && (
+                <Box sx={{ mb: 3 }}>
+                  <Typography variant="subtitle2" fontWeight="bold" gutterBottom>
+                    Condition Description
+                  </Typography>
+                  <Paper sx={{ p: 2, bgcolor: 'grey.50' }}>
+                    <Typography variant="body2" style={{ whiteSpace: 'pre-wrap' }}>
+                      {selectedOrder.return_evidence_description}
+                    </Typography>
+                  </Paper>
+                </Box>
+              )}
+
+              {/* Shipping Info */}
+              {selectedOrder.return_shipping_provider && (
+                <Box sx={{ mb: 2 }}>
+                  <Typography variant="subtitle2" fontWeight="bold" gutterBottom>
+                    Shipping Information
+                  </Typography>
+                  <Typography variant="body2">
+                    <strong>Provider:</strong> {selectedOrder.return_shipping_provider}
+                  </Typography>
+                  {selectedOrder.return_tracking_number && (
+                    <Typography variant="body2">
+                      <strong>Tracking:</strong> {selectedOrder.return_tracking_number}
+                    </Typography>
+                  )}
+                </Box>
+              )}
+
+              {!selectedOrder.return_evidence_photos && !selectedOrder.return_evidence_video && !selectedOrder.return_evidence_description && (
+                <Alert severity="warning">
+                  User has not uploaded evidence yet. Evidence will be available after admin approves the return request and user submits the form.
+                </Alert>
+              )}
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setEvidenceDialogOpen(false)}>
+            Close
           </Button>
         </DialogActions>
       </Dialog>

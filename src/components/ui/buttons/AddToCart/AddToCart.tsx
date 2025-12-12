@@ -33,11 +33,6 @@ export default function AddToCart({ product, size, color }: IAddToCart) {
       return;
     }
 
-    if (!size) {
-      setSnackbar({ open: true, message: t("product.select_size") || "Please select a size", severity: "error" });
-      return;
-    }
-
     try {
       setLoading(true);
       await addToCart(

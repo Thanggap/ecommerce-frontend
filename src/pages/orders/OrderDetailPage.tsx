@@ -12,11 +12,17 @@ import {
   CircularProgress,
   Alert,
   TextField,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Rating,
 } from '@mui/material';
 import {
   ArrowBack as BackIcon,
   LocalShipping as ShippingIcon,
   Delete as DeleteIcon,
+  Star as StarIcon,
 } from '@mui/icons-material';
 import { useTranslation } from 'react-i18next';
 import { useCurrency } from '../../context/CurrencyContext';
@@ -84,6 +90,31 @@ const OrderDetailPage: React.FC = () => {
   const [description, setDescription] = useState('');
   const [submittingEvidence, setSubmittingEvidence] = useState(false);
 
+  // Review state
+  const [showReviewDialog, setShowReviewDialog] = useState(false);
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewComment, setReviewComment] = useState('');
+  const [reviewImages, setReviewImages] = useState<string[]>([]);
+  const [reviewVideo, setReviewVideo] = useState('');
+  const [reviewImageFiles, setReviewImageFiles] = useState<File[]>([]);
+  const [reviewImagePreviews, setReviewImagePreviews] = useState<string[]>([]);
+  const [reviewVideoFile, setReviewVideoFile] = useState<File | null>(null);
+  const [reviewVideoPreview, setReviewVideoPreview] = useState('');
+  const [uploadingReviewMedia, setUploadingReviewMedia] = useState(false);
+  const [submittingReview, setSubmittingReview] = useState(false);
+
+  // Return request state (with evidence)
+  const [showReturnDialog, setShowReturnDialog] = useState(false);
+  const [returnReason, setReturnReason] = useState('');
+  const [returnImages, setReturnImages] = useState<string[]>([]);
+  const [returnVideo, setReturnVideo] = useState('');
+  const [returnImageFiles, setReturnImageFiles] = useState<File[]>([]);
+  const [returnImagePreviews, setReturnImagePreviews] = useState<string[]>([]);
+  const [returnVideoFile, setReturnVideoFile] = useState<File | null>(null);
+  const [returnVideoPreview, setReturnVideoPreview] = useState('');
+  const [uploadingReturnMedia, setUploadingReturnMedia] = useState(false);
+  const [submittingReturn, setSubmittingReturn] = useState(false);
+
   useEffect(() => {
     if (orderId) {
       fetchOrder(parseInt(orderId));
@@ -103,7 +134,16 @@ const OrderDetailPage: React.FC = () => {
   };
 
   const handleCancelOrder = async () => {
-    if (!order || !window.confirm('Are you sure you want to cancel this order?')) {
+    if (!order) return;
+
+    // If delivered, open return request dialog instead
+    if (order.status === 'delivered') {
+      setShowReturnDialog(true);
+      return;
+    }
+
+    // Regular cancel/refund for non-delivered orders
+    if (!window.confirm('Are you sure you want to cancel this order?')) {
       return;
     }
 
@@ -117,6 +157,263 @@ const OrderDetailPage: React.FC = () => {
       alert(errorMsg);
     } finally {
       setCancelling(false);
+    }
+  };
+
+  const handleConfirmDelivery = async () => {
+    if (!order || !window.confirm('Have you received your order?')) {
+      return;
+    }
+
+    setCancelling(true);
+    try {
+      await orderService.userConfirmDelivery(order.id);
+      await fetchOrder(order.id); // Refresh order data
+      alert('Delivery confirmed! Thank you for shopping with us.');
+    } catch (err: any) {
+      const errorMsg = err.response?.data?.detail || 'Failed to confirm delivery';
+      alert(errorMsg);
+    } finally {
+      setCancelling(false);
+    }
+  };
+
+  // Review handlers
+  const handleReviewImageFilesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length + reviewImageFiles.length > 5) {
+      alert('Maximum 5 images allowed');
+      return;
+    }
+    
+    setReviewImageFiles([...reviewImageFiles, ...files]);
+    
+    // Generate previews
+    files.forEach(file => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setReviewImagePreviews(prev => [...prev, reader.result as string]);
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleUploadReviewImages = async () => {
+    if (reviewImageFiles.length === 0) return;
+    
+    setUploadingReviewMedia(true);
+    try {
+      const uploadedUrls: string[] = [];
+      
+      for (const file of reviewImageFiles) {
+        const formData = new FormData();
+        formData.append('file', file);
+        
+        const response = await api.post('/upload/review', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
+        
+        uploadedUrls.push(response.data.url);
+      }
+      
+      setReviewImages(uploadedUrls);
+      alert(`${uploadedUrls.length} images uploaded successfully!`);
+    } catch (error) {
+      console.error('Upload failed:', error);
+      alert('Failed to upload images');
+    } finally {
+      setUploadingReviewMedia(false);
+    }
+  };
+
+  const handleReviewVideoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    setReviewVideoFile(file);
+    
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setReviewVideoPreview(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleUploadReviewVideo = async () => {
+    if (!reviewVideoFile) return;
+    
+    setUploadingReviewMedia(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', reviewVideoFile);
+      
+      const response = await api.post('/upload/review', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      
+      setReviewVideo(response.data.url);
+      alert('Video uploaded successfully!');
+    } catch (error) {
+      console.error('Upload failed:', error);
+      alert('Failed to upload video');
+    } finally {
+      setUploadingReviewMedia(false);
+    }
+  };
+
+  const handleSubmitReview = async () => {
+    if (!order || reviewComment.trim().length === 0) {
+      alert('Please write a comment');
+      return;
+    }
+
+    setSubmittingReview(true);
+    try {
+      await orderService.userSubmitReview(order.id, {
+        rating: reviewRating,
+        comment: reviewComment,
+        images: reviewImages,
+        video: reviewVideo || undefined
+      });
+      
+      alert('Review submitted successfully! Thank you for your feedback.');
+      
+      // Reset review form
+      setShowReviewDialog(false);
+      setReviewRating(5);
+      setReviewComment('');
+      setReviewImages([]);
+      setReviewVideo('');
+      setReviewImageFiles([]);
+      setReviewImagePreviews([]);
+      setReviewVideoFile(null);
+      setReviewVideoPreview('');
+      
+      await fetchOrder(order.id); // Refresh order
+    } catch (err: any) {
+      const errorMsg = err.response?.data?.detail || 'Failed to submit review';
+      alert(errorMsg);
+    } finally {
+      setSubmittingReview(false);
+    }
+  };
+
+  // Return request handlers (with evidence)
+  const handleReturnImageFilesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length + returnImageFiles.length > 5) {
+      alert('Maximum 5 images allowed');
+      return;
+    }
+    
+    setReturnImageFiles([...returnImageFiles, ...files]);
+    
+    files.forEach(file => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setReturnImagePreviews(prev => [...prev, reader.result as string]);
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleUploadReturnImages = async () => {
+    if (returnImageFiles.length === 0) return;
+    
+    setUploadingReturnMedia(true);
+    try {
+      const uploadedUrls: string[] = [];
+      
+      for (const file of returnImageFiles) {
+        const formData = new FormData();
+        formData.append('file', file);
+        
+        const response = await api.post('/upload/return-evidence', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
+        
+        uploadedUrls.push(response.data.url);
+      }
+      
+      setReturnImages(uploadedUrls);
+      alert(`${uploadedUrls.length} images uploaded successfully!`);
+    } catch (error) {
+      console.error('Upload failed:', error);
+      alert('Failed to upload images');
+    } finally {
+      setUploadingReturnMedia(false);
+    }
+  };
+
+  const handleReturnVideoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    setReturnVideoFile(file);
+    
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setReturnVideoPreview(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleUploadReturnVideo = async () => {
+    if (!returnVideoFile) return;
+    
+    setUploadingReturnMedia(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', returnVideoFile);
+      
+      const response = await api.post('/upload/return-evidence', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      
+      setReturnVideo(response.data.url);
+      alert('Video uploaded successfully!');
+    } catch (error) {
+      console.error('Upload failed:', error);
+      alert('Failed to upload video');
+    } finally {
+      setUploadingReturnMedia(false);
+    }
+  };
+
+  const handleSubmitReturnRequest = async () => {
+    if (!order || returnReason.trim().length === 0) {
+      alert('Please provide a reason for return');
+      return;
+    }
+
+    setSubmittingReturn(true);
+    try {
+      // Call modified cancel endpoint with evidence
+      const updatedOrder = await orderService.cancelOrder(order.id, {
+        reason: returnReason,
+        evidence_photos: returnImages,
+        evidence_video: returnVideo || undefined,
+        evidence_description: returnReason
+      });
+      
+      setOrder(updatedOrder);
+      alert('Return request submitted successfully! Admin will review your request.');
+      
+      // Reset form
+      setShowReturnDialog(false);
+      setReturnReason('');
+      setReturnImages([]);
+      setReturnVideo('');
+      setReturnImageFiles([]);
+      setReturnImagePreviews([]);
+      setReturnVideoFile(null);
+      setReturnVideoPreview('');
+      
+    } catch (err: any) {
+      const errorMsg = err.response?.data?.detail || 'Failed to submit return request';
+      alert(errorMsg);
+    } finally {
+      setSubmittingReturn(false);
     }
   };
 
@@ -483,6 +780,34 @@ const OrderDetailPage: React.FC = () => {
               </Button>
             )}
 
+            {/* Confirm Delivery Button */}
+            {order?.status === 'shipped' && (
+              <Button
+                variant="contained"
+                color="success"
+                fullWidth
+                onClick={handleConfirmDelivery}
+                disabled={cancelling}
+                sx={{ mt: 2 }}
+              >
+                {cancelling ? 'Processing...' : 'Confirm Receipt'}
+              </Button>
+            )}
+
+            {/* Write Review Button */}
+            {order?.status === 'delivered' && (
+              <Button
+                variant="contained"
+                color="primary"
+                fullWidth
+                startIcon={<StarIcon />}
+                onClick={() => setShowReviewDialog(true)}
+                sx={{ mt: 2 }}
+              >
+                Write Review
+              </Button>
+            )}
+
             {/* Status Messages */}
             {order.status === 'return_requested' && !order.return_requested_at && (
               <Alert severity="info" sx={{ mt: 2 }}>
@@ -694,6 +1019,253 @@ const OrderDetailPage: React.FC = () => {
           </Paper>
         </Grid>
       </Grid>
+
+      {/* Return Request Dialog */}
+      <Dialog
+        open={showReturnDialog}
+        onClose={() => setShowReturnDialog(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Request Return</DialogTitle>
+        <DialogContent>
+          <Box sx={{ pt: 2 }}>
+            {/* Return Reason */}
+            <TextField
+              label="Reason for Return"
+              multiline
+              rows={3}
+              fullWidth
+              value={returnReason}
+              onChange={(e) => setReturnReason(e.target.value)}
+              placeholder="Please describe why you want to return this order..."
+              required
+              helperText="Please provide a clear reason for the return request"
+            />
+
+            {/* Upload Evidence Images */}
+            <Box sx={{ mt: 3 }}>
+              <Typography variant="subtitle2" gutterBottom>
+                Upload Evidence Images (optional, max 5)
+              </Typography>
+              <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1 }}>
+                Photos showing product condition, defects, or issues
+              </Typography>
+              <input
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={handleReturnImageFilesChange}
+                style={{ display: 'block', marginBottom: '8px' }}
+              />
+              {returnImageFiles.length > 0 && (
+                <Box sx={{ mb: 1 }}>
+                  <Typography variant="body2" color="text.secondary">
+                    {returnImageFiles.length} images selected
+                  </Typography>
+                  {/* Preview thumbnails */}
+                  <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mt: 1 }}>
+                    {returnImagePreviews.map((preview, idx) => (
+                      <img
+                        key={idx}
+                        src={preview}
+                        alt={`Evidence ${idx + 1}`}
+                        style={{ width: '80px', height: '80px', objectFit: 'cover', borderRadius: '4px' }}
+                      />
+                    ))}
+                  </Box>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    onClick={handleUploadReturnImages}
+                    disabled={uploadingReturnMedia || returnImages.length > 0}
+                    sx={{ mt: 1 }}
+                  >
+                    {uploadingReturnMedia ? 'Uploading...' : returnImages.length > 0 ? 'Images Uploaded' : 'Upload Images'}
+                  </Button>
+                </Box>
+              )}
+            </Box>
+
+            {/* Upload Evidence Video */}
+            <Box sx={{ mt: 2 }}>
+              <Typography variant="subtitle2" gutterBottom>
+                Upload Evidence Video (optional)
+              </Typography>
+              <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1 }}>
+                Video demonstrating the issue or product condition
+              </Typography>
+              <input
+                type="file"
+                accept="video/*"
+                onChange={handleReturnVideoFileChange}
+                style={{ display: 'block', marginBottom: '8px' }}
+              />
+              {returnVideoFile && (
+                <Box sx={{ mb: 1 }}>
+                  <Typography variant="body2" color="text.secondary">
+                    Video selected: {returnVideoFile.name}
+                  </Typography>
+                  {returnVideoPreview && (
+                    <video
+                      src={returnVideoPreview}
+                      controls
+                      style={{ width: '100%', maxHeight: '200px', marginTop: '8px', borderRadius: '4px' }}
+                    />
+                  )}
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    onClick={handleUploadReturnVideo}
+                    disabled={uploadingReturnMedia || !!returnVideo}
+                    sx={{ mt: 1 }}
+                  >
+                    {uploadingReturnMedia ? 'Uploading...' : returnVideo ? 'Video Uploaded' : 'Upload Video'}
+                  </Button>
+                </Box>
+              )}
+            </Box>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowReturnDialog(false)}>
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            color="warning"
+            onClick={handleSubmitReturnRequest}
+            disabled={submittingReturn || !returnReason.trim()}
+          >
+            {submittingReturn ? 'Submitting...' : 'Submit Return Request'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Review Dialog */}
+      <Dialog 
+        open={showReviewDialog} 
+        onClose={() => setShowReviewDialog(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Write a Review</DialogTitle>
+        <DialogContent>
+          <Box sx={{ pt: 2 }}>
+            {/* Rating */}
+            <Typography component="legend" gutterBottom>
+              Rating
+            </Typography>
+            <Rating
+              value={reviewRating}
+              onChange={(e, newValue) => setReviewRating(newValue || 5)}
+              size="large"
+            />
+
+            {/* Comment */}
+            <TextField
+              label="Your Review"
+              multiline
+              rows={4}
+              fullWidth
+              value={reviewComment}
+              onChange={(e) => setReviewComment(e.target.value)}
+              sx={{ mt: 2 }}
+              placeholder="Share your experience with this product..."
+              required
+            />
+
+            {/* Upload Images */}
+            <Box sx={{ mt: 3 }}>
+              <Typography variant="subtitle2" gutterBottom>
+                Upload Images (optional, max 5)
+              </Typography>
+              <input
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={handleReviewImageFilesChange}
+                style={{ display: 'block', marginBottom: '8px' }}
+              />
+              {reviewImageFiles.length > 0 && (
+                <Box sx={{ mb: 1 }}>
+                  <Typography variant="body2" color="text.secondary">
+                    {reviewImageFiles.length} images selected
+                  </Typography>
+                  {/* Preview thumbnails */}
+                  <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mt: 1 }}>
+                    {reviewImagePreviews.map((preview, idx) => (
+                      <img 
+                        key={idx} 
+                        src={preview} 
+                        alt={`Preview ${idx + 1}`}
+                        style={{ width: '60px', height: '60px', objectFit: 'cover', borderRadius: '4px' }}
+                      />
+                    ))}
+                  </Box>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    onClick={handleUploadReviewImages}
+                    disabled={uploadingReviewMedia || reviewImages.length > 0}
+                    sx={{ mt: 1 }}
+                  >
+                    {uploadingReviewMedia ? 'Uploading...' : reviewImages.length > 0 ? 'Images Uploaded ✓' : 'Upload Images'}
+                  </Button>
+                </Box>
+              )}
+            </Box>
+
+            {/* Upload Video */}
+            <Box sx={{ mt: 2 }}>
+              <Typography variant="subtitle2" gutterBottom>
+                Upload Video (optional)
+              </Typography>
+              <input
+                type="file"
+                accept="video/*"
+                onChange={handleReviewVideoFileChange}
+                style={{ display: 'block', marginBottom: '8px' }}
+              />
+              {reviewVideoFile && (
+                <Box sx={{ mb: 1 }}>
+                  <Typography variant="body2" color="text.secondary">
+                    Video selected: {reviewVideoFile.name}
+                  </Typography>
+                  {reviewVideoPreview && (
+                    <video 
+                      src={reviewVideoPreview} 
+                      controls 
+                      style={{ width: '100%', maxHeight: '200px', marginTop: '8px', borderRadius: '4px' }}
+                    />
+                  )}
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    onClick={handleUploadReviewVideo}
+                    disabled={uploadingReviewMedia || !!reviewVideo}
+                    sx={{ mt: 1 }}
+                  >
+                    {uploadingReviewMedia ? 'Uploading...' : reviewVideo ? 'Video Uploaded ✓' : 'Upload Video'}
+                  </Button>
+                </Box>
+              )}
+            </Box>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowReviewDialog(false)}>
+            Cancel
+          </Button>
+          <Button 
+            variant="contained"
+            onClick={handleSubmitReview}
+            disabled={submittingReview || !reviewComment.trim()}
+          >
+            {submittingReview ? 'Submitting...' : 'Submit Review'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Container>
   );
 };

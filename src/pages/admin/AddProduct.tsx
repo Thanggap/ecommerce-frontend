@@ -36,7 +36,6 @@ export default function AddProduct() {
   // Supplement-specific fields
   const [supplementInfo, setSupplementInfo] = useState({
     serving_size: "",
-    servings_per_container: "",
     ingredients: "",
     usage_instructions: "",
     warnings: "",
@@ -45,6 +44,10 @@ export default function AddProduct() {
     country_of_origin: "",
     certification: "",
   });
+
+  // Product sizes - dynamic list
+  const [sizes, setSizes] = useState<Array<{ size: string; stock_quantity: number }>>([]);
+  const [newSize, setNewSize] = useState({ size: "30", stock_quantity: 0 });
 
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string>("");
@@ -87,7 +90,7 @@ export default function AddProduct() {
     
     setSupplementInfo((prev) => ({
       ...prev,
-      [name]: name === "servings_per_container" ? (value ? Number(value) : "") : value,
+      [name]: value,
     }));
   };
 
@@ -135,6 +138,30 @@ export default function AddProduct() {
     }
 
     setUploading(false);
+  };
+
+  const handleAddSize = () => {
+    if (newSize.stock_quantity <= 0) {
+      setError("Stock quantity must be greater than 0");
+      return;
+    }
+    
+    // Check if size already exists
+    if (sizes.some(s => s.size === `${newSize.size} servings`)) {
+      setError(`${newSize.size} servings size already added`);
+      return;
+    }
+    
+    setSizes(prev => [...prev, { 
+      size: `${newSize.size} servings`, 
+      stock_quantity: newSize.stock_quantity 
+    }]);
+    setNewSize({ size: "30", stock_quantity: 0 });
+    setError("");
+  };
+
+  const handleRemoveSize = (index: number) => {
+    setSizes(prev => prev.filter((_, i) => i !== index));
   };
 
   const validateForm = (): boolean => {
@@ -226,18 +253,6 @@ export default function AddProduct() {
       errors.serving_size = "Serving size must not exceed 100 characters";
     }
     
-    // Servings per container validation (optional but if provided)
-    if (supplementInfo.servings_per_container) {
-      const servings = Number(supplementInfo.servings_per_container);
-      if (servings < 0) {
-        errors.servings_per_container = "Servings per container cannot be negative";
-      } else if (!Number.isInteger(servings)) {
-        errors.servings_per_container = "Servings per container must be a whole number";
-      } else if (servings > 9999) {
-        errors.servings_per_container = "Servings per container is too large";
-      }
-    }
-    
     // Ingredients validation (optional but if provided)
     if (supplementInfo.ingredients && supplementInfo.ingredients.length > 2000) {
       errors.ingredients = "Ingredients list must not exceed 2000 characters";
@@ -309,7 +324,6 @@ export default function AddProduct() {
 
     // Add supplement info (only if provided)
     if (supplementInfo.serving_size) productData.serving_size = supplementInfo.serving_size;
-    if (supplementInfo.servings_per_container) productData.servings_per_container = Number(supplementInfo.servings_per_container);
     if (supplementInfo.ingredients) productData.ingredients = supplementInfo.ingredients;
     if (supplementInfo.usage_instructions) productData.usage_instructions = supplementInfo.usage_instructions;
     if (supplementInfo.warnings) productData.warnings = supplementInfo.warnings;
@@ -317,6 +331,11 @@ export default function AddProduct() {
     if (supplementInfo.manufacturer) productData.manufacturer = supplementInfo.manufacturer;
     if (supplementInfo.country_of_origin) productData.country_of_origin = supplementInfo.country_of_origin;
     if (supplementInfo.certification) productData.certification = supplementInfo.certification;
+
+    // Add sizes if provided
+    if (sizes.length > 0) {
+      productData.sizes = sizes;
+    }
 
     const result = await createProduct(productData);
 
@@ -336,7 +355,6 @@ export default function AddProduct() {
       });
       setSupplementInfo({
         serving_size: "",
-        servings_per_container: "",
         ingredients: "",
         usage_instructions: "",
         warnings: "",
@@ -345,6 +363,8 @@ export default function AddProduct() {
         country_of_origin: "",
         certification: "",
       });
+      setSizes([]);
+      setNewSize({ size: "30", stock_quantity: 0 });
       setImageFile(null);
       setImagePreview("");
       
@@ -485,18 +505,6 @@ export default function AddProduct() {
                 helperText={fieldErrors.serving_size || "Optional - max 100 characters"}
                 inputProps={{ maxLength: 100 }}
               />
-              <TextField
-                fullWidth
-                label="Servings per Container"
-                name="servings_per_container"
-                type="number"
-                value={supplementInfo.servings_per_container}
-                onChange={handleSupplementChange}
-                InputProps={{ inputProps: { min: 0, max: 9999, step: 1 } }}
-                placeholder="e.g., 30, 60, 90"
-                error={!!fieldErrors.servings_per_container}
-                helperText={fieldErrors.servings_per_container || "Optional - whole number 0-9999"}
-              />
             </Box>
 
             <TextField
@@ -616,6 +624,81 @@ export default function AddProduct() {
               />
             </Box>
 
+            {/* Product Sizes Section */}
+            <Box sx={{ mt: 3 }}>
+              <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 600 }}>
+                Product Sizes (Optional)
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                Add size options with their stock quantities
+              </Typography>
+              
+              <Box sx={{ display: "flex", gap: 2, mb: 2, alignItems: "flex-start" }}>
+                <FormControl sx={{ minWidth: 200 }}>
+                  <InputLabel>Size</InputLabel>
+                  <Select
+                    value={newSize.size}
+                    label="Size"
+                    onChange={(e) => setNewSize(prev => ({ ...prev, size: e.target.value }))}
+                  >
+                    <MenuItem value="30">30 Servings</MenuItem>
+                    <MenuItem value="60">60 Servings</MenuItem>
+                    <MenuItem value="90">90 Servings</MenuItem>
+                  </Select>
+                </FormControl>
+                
+                <TextField
+                  label="Stock Quantity"
+                  type="number"
+                  value={newSize.stock_quantity || ""}
+                  onChange={(e) => setNewSize(prev => ({ ...prev, stock_quantity: Number(e.target.value) }))}
+                  InputProps={{ inputProps: { min: 0, step: 1 } }}
+                  sx={{ flex: 1 }}
+                />
+                
+                <Button 
+                  variant="contained" 
+                  onClick={handleAddSize}
+                  sx={{ height: 56, minWidth: 100 }}
+                >
+                  Add
+                </Button>
+              </Box>
+
+              {sizes.length > 0 && (
+                <Box sx={{ mt: 2 }}>
+                  <Typography variant="body2" sx={{ mb: 1, fontWeight: 600, color: "text.secondary" }}>
+                    Added Sizes:
+                  </Typography>
+                  {sizes.map((size, index) => (
+                    <Box 
+                      key={index} 
+                      sx={{ 
+                        display: "flex", 
+                        justifyContent: "space-between", 
+                        alignItems: "center",
+                        p: 1.5, 
+                        mb: 1, 
+                        bgcolor: "#f5f5f5", 
+                        borderRadius: 1,
+                      }}
+                    >
+                      <Typography variant="body2">
+                        <strong>{size.size}</strong> - Stock: {size.stock_quantity}
+                      </Typography>
+                      <Button 
+                        size="small" 
+                        color="error" 
+                        onClick={() => handleRemoveSize(index)}
+                      >
+                        Remove
+                      </Button>
+                    </Box>
+                  ))}
+                </Box>
+              )}
+            </Box>
+
             <Divider sx={{ my: 4 }} />
 
             {/* Content & Media */}
@@ -679,7 +762,7 @@ export default function AddProduct() {
                   disabled={uploading}
                   sx={{ mb: 2 }}
                 >
-                  {uploading ? <CircularProgress size={24} /> : "Upload to Cloudinary"}
+                  {uploading ? <CircularProgress size={24} /> : "Upload Image"}
                 </Button>
               )}
 
