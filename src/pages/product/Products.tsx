@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { useCurrency } from "../../context/CurrencyContext";
 
 // Methods
 import { getProductList, IProductFilters } from "../../services/Product";
@@ -29,6 +30,7 @@ import {
   Breadcrumbs,
   Link,
   Paper,
+  Pagination,
 } from "@mui/material";
 import {
   Search,
@@ -63,10 +65,17 @@ export default function Products() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const { config: currencyConfig } = useCurrency();
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+
+  // Pagination state
+  const [page, setPage] = useState<number>(1);
+  const [totalPages, setTotalPages] = useState<number>(1);
+  const [totalProducts, setTotalProducts] = useState<number>(0);
+  const itemsPerPage = 20;
 
   // Filter states
   const [search, setSearch] = useState<string>("");
@@ -83,14 +92,30 @@ export default function Products() {
     setLoading(true);
     try {
       const response = await getProductList(filters);
-      setProducts(response || []);
+      
+      // Handle array response (legacy) or object response with pagination
+      if (Array.isArray(response)) {
+        setProducts(response || []);
+        setTotalProducts(response.length);
+        setTotalPages(1);
+      } else if (response && response.items) {
+        setProducts(response.items || []);
+        setTotalProducts(response.total || 0);
+        setTotalPages(response.total_pages || Math.ceil((response.total || 0) / itemsPerPage));
+      } else {
+        setProducts([]);
+        setTotalProducts(0);
+        setTotalPages(1);
+      }
     } catch (error) {
       console.error("Error loading products:", error);
       setProducts([]);
+      setTotalProducts(0);
+      setTotalPages(1);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [itemsPerPage]);
 
   // Search products using Elasticsearch
   const searchProductsES = useCallback(async (query: string, filters: ISearchFilters) => {
@@ -104,12 +129,14 @@ export default function Products() {
       
       if (response && response.items) {
         setProducts(response.items);
+        setTotalProducts(response.total || 0);
+        setTotalPages(response.total_pages || Math.ceil((response.total || 0) / itemsPerPage));
       } else {
         // Fallback to regular API if ES fails
         console.warn("Elasticsearch unavailable, falling back to regular API");
         await fetchProducts({
-          page: 0,
-          limit: 20,
+          page: filters.page || 0,
+          limit: itemsPerPage,
           search: query || undefined,
           product_type: filters.product_type,
           min_price: filters.min_price,
@@ -121,10 +148,12 @@ export default function Products() {
     } catch (error) {
       console.error("Error searching products:", error);
       setProducts([]);
+      setTotalProducts(0);
+      setTotalPages(1);
     } finally {
       setLoading(false);
     }
-  }, [fetchProducts]);
+  }, [fetchProducts, itemsPerPage]);
 
   // Parse URL params on mount and initialize filters
   useEffect(() => {
@@ -144,31 +173,36 @@ export default function Products() {
   useEffect(() => {
     if (!initialized) return;
     
+    // Reset to page 1 when filters change
+    setPage(1);
+    
     // If no search query, use regular API
     if (!search) {
       const filters: IProductFilters = {
-        page: 0,
-        limit: 20,
+        page: 0, // API uses 0-indexed pages
+        limit: itemsPerPage,
         product_type: productType || undefined,
         on_sale: onSale || undefined,
+        sort_by: sortBy || undefined,
       };
       fetchProducts(filters);
       setSearchMode(false);
     }
-  }, [initialized, productType, onSale, search, fetchProducts]);
+  }, [initialized, productType, onSale, search, sortBy, fetchProducts, itemsPerPage]);
 
   // Debounced search effect
   useEffect(() => {
     if (!initialized || !search) return;
 
     const timer = setTimeout(() => {
+      setPage(1); // Reset to page 1 on new search
       const searchFilters: ISearchFilters = {
         q: search,
-        page: 0,
-        limit: 20,
+        page: 0, // API uses 0-indexed
+        limit: itemsPerPage,
         product_type: productType || undefined,
-        min_price: priceRange[0] > 0 ? priceRange[0] : undefined,
-        max_price: priceRange[1] < 10000000 ? priceRange[1] : undefined,
+        min_price: priceRange[0] > 0 ? priceRange[0] / currencyConfig.rate : undefined,
+        max_price: priceRange[1] < 10000000 ? priceRange[1] / currencyConfig.rate : undefined,
         on_sale: onSale || undefined,
         sort: sortBy as any,
       };
@@ -176,18 +210,19 @@ export default function Products() {
     }, 500); // 500ms debounce
 
     return () => clearTimeout(timer);
-  }, [initialized, search, productType, priceRange, onSale, sortBy, searchProductsES]);
+  }, [initialized, search, productType, priceRange, onSale, sortBy, searchProductsES, itemsPerPage, currencyConfig.rate]);
 
   const handleSearch = () => {
+    setPage(1); // Reset to page 1
     if (search) {
       // Use Elasticsearch search
       const searchFilters: ISearchFilters = {
         q: search,
         page: 0,
-        limit: 20,
+        limit: itemsPerPage,
         product_type: productType || undefined,
-        min_price: priceRange[0] > 0 ? priceRange[0] : undefined,
-        max_price: priceRange[1] < 10000000 ? priceRange[1] : undefined,
+        min_price: priceRange[0] > 0 ? priceRange[0] / currencyConfig.rate : undefined,
+        max_price: priceRange[1] < 10000000 ? priceRange[1] / currencyConfig.rate : undefined,
         on_sale: onSale || undefined,
         sort: sortBy as any,
       };
@@ -196,10 +231,10 @@ export default function Products() {
       // Use regular API
       const filters: IProductFilters = {
         page: 0,
-        limit: 20,
+        limit: itemsPerPage,
         product_type: productType || undefined,
-        min_price: priceRange[0] || undefined,
-        max_price: priceRange[1] < 10000000 ? priceRange[1] : undefined,
+        min_price: priceRange[0] > 0 ? priceRange[0] / currencyConfig.rate : undefined,
+        max_price: priceRange[1] < 10000000 ? priceRange[1] / currencyConfig.rate : undefined,
         manufacturer: manufacturer || undefined,
         certification: certification || undefined,
         on_sale: onSale || undefined,
@@ -220,9 +255,42 @@ export default function Products() {
     setCertification("");
     setOnSale(false);
     setSearchMode(false);
+    setPage(1);
     // Clear URL params
     navigate("/products", { replace: true });
-    fetchProducts({ page: 0, limit: 20 });
+    fetchProducts({ page: 0, limit: itemsPerPage });
+  };
+
+  const handlePageChange = (_event: React.ChangeEvent<unknown>, value: number) => {
+    setPage(value);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    
+    if (search) {
+      const searchFilters: ISearchFilters = {
+        q: search,
+        page: value - 1, // API uses 0-indexed
+        limit: itemsPerPage,
+        product_type: productType || undefined,
+        min_price: priceRange[0] > 0 ? priceRange[0] / currencyConfig.rate : undefined,
+        max_price: priceRange[1] < 10000000 ? priceRange[1] / currencyConfig.rate : undefined,
+        on_sale: onSale || undefined,
+        sort: sortBy as any,
+      };
+      searchProductsES(search, searchFilters);
+    } else {
+      const filters: IProductFilters = {
+        page: value - 1, // API uses 0-indexed
+        limit: itemsPerPage,
+        product_type: productType || undefined,
+        min_price: priceRange[0] > 0 ? priceRange[0] / currencyConfig.rate : undefined,
+        max_price: priceRange[1] < 10000000 ? priceRange[1] / currencyConfig.rate : undefined,
+        manufacturer: manufacturer || undefined,
+        certification: certification || undefined,
+        on_sale: onSale || undefined,
+        sort_by: sortBy || undefined,
+      };
+      fetchProducts(filters);
+    }
   };
 
   const activeFiltersCount = [
@@ -436,7 +504,14 @@ export default function Products() {
                     {productType || t("product.all_products")}
                   </Typography>
                   <Typography variant="body2" color="text.secondary" sx={{ fontSize: { xs: "0.75rem", sm: "0.875rem" } }}>
-                    {products.length} {t("product.items_found")}
+                    {totalProducts > 0 ? (
+                      <>
+                        {totalProducts} {t("product.items_found")}
+                        {totalPages > 1 && ` • Page ${page} of ${totalPages}`}
+                      </>
+                    ) : (
+                      `${products.length} ${t("product.items_found")}`
+                    )}
                     {searchMode && search && (
                       <Chip 
                         label={`Search: "${search}"`} 
@@ -470,7 +545,7 @@ export default function Products() {
                   </Button>
 
                   {/* Sort */}
-                  <FormControl size="small" sx={{ minWidth: 150 }}>
+                  <FormControl size="small" sx={{ minWidth: 150, zIndex: 1 }}>
                     <InputLabel>
                       <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
                         <Sort fontSize="small" />
@@ -481,6 +556,14 @@ export default function Products() {
                       value={sortBy}
                       label={t("product.sort.label")}
                       onChange={(e) => setSortBy(e.target.value)}
+                      MenuProps={{
+                        PaperProps: {
+                          sx: {
+                            zIndex: 1300, // Higher than product cards
+                            mt: 1,
+                          }
+                        }
+                      }}
                     >
                       {SORT_OPTIONS.map((option) => (
                         <MenuItem key={option.value} value={option.value}>
@@ -608,6 +691,21 @@ export default function Products() {
                   {t("product.filter.reset")}
                 </Button>
               </Paper>
+            )}
+
+            {/* Pagination */}
+            {!loading && products.length > 0 && totalPages > 1 && (
+              <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
+                <Pagination 
+                  count={totalPages} 
+                  page={page} 
+                  onChange={handlePageChange}
+                  color="primary"
+                  size="large"
+                  showFirstButton
+                  showLastButton
+                />
+              </Box>
             )}
           </Box>
         </Box>

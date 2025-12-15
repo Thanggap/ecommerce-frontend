@@ -115,9 +115,9 @@ const OrderSuccessPage: React.FC = () => {
 
           {/* Order Items */}
           <Typography variant="subtitle2" gutterBottom>
-            {t('order_success.items', 'Items')} ({order.items.length})
+            {t('order_success.items', 'Items')} ({order.items?.length || 0})
           </Typography>
-          {order.items.map((item) => (
+          {order.items?.map((item) => (
             <Box 
               key={item.id} 
               sx={{ 

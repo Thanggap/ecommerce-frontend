@@ -57,7 +57,7 @@ export interface IOrder {
   return_received_at?: string;
   qc_notes?: string;
   
-  items: IOrderItem[];
+  items?: IOrderItem[];
   created_at: string;
   updated_at: string;
 }

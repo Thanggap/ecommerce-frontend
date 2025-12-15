@@ -35,13 +35,42 @@ const PaymentSuccessPage: React.FC = () => {
   const sessionId = searchParams.get('session_id');
 
   useEffect(() => {
-    if (orderId) {
+    if (orderId && sessionId) {
+      // First verify payment session (auto-confirm if webhook didn't fire)
+      verifyPaymentSession(sessionId);
+      // Then fetch order details
+      fetchOrder(parseInt(orderId));
+    } else if (orderId) {
       fetchOrder(parseInt(orderId));
     } else {
       navigate('/');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [orderId]);
+  }, [orderId, sessionId]);
+
+  const verifyPaymentSession = async (session_id: string) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`http://localhost:8000/payments/verify-session/${session_id}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Payment verification:', data);
+        // If order was just confirmed, refresh order data
+        if (data.status === 'confirmed' && orderId) {
+          setTimeout(() => fetchOrder(parseInt(orderId)), 1000);
+        }
+      }
+    } catch (error) {
+      console.error('Error verifying payment:', error);
+    }
+  };
 
   const fetchOrder = async (id: number) => {
     try {
@@ -133,9 +162,9 @@ const PaymentSuccessPage: React.FC = () => {
 
           {/* Order Items */}
           <Typography variant="subtitle2" gutterBottom>
-            {t('payment_success.items', 'Items')} ({order.items.length})
+            {t('payment_success.items', 'Items')} ({order.items?.length || 0})
           </Typography>
-          {order.items.map((item) => (
+          {order.items?.map((item) => (
             <Box 
               key={item.id} 
               sx={{ 

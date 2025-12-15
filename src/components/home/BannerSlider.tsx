@@ -22,13 +22,13 @@ const defaultBanners = [
   {
     id: 2,
     imageUrl: "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=1200&h=400&fit=crop",
-    link: "/products?category=Vitamins & Minerals",
+    link: "/products?category=Vitamins%20%26%20Minerals",
     alt: "Premium Vitamins & Minerals",
   },
   {
     id: 3,
     imageUrl: "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=1200&h=400&fit=crop",
-    link: "/products?category=Protein & Fitness",
+    link: "/products?category=Protein%20%26%20Fitness",
     alt: "Protein & Fitness Supplements",
   },
   {

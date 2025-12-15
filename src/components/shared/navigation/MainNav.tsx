@@ -20,9 +20,9 @@ export default function MainNav() {
   const navLinks = [
     { label: t("nav.home"), href: "/" },
     { label: t("nav.products"), href: "/products" },
-    { label: t("home.categories.vitamins"), href: "/products?product_type=Vitamins & Minerals" },
-    { label: t("home.categories.protein"), href: "/products?product_type=Protein & Fitness" },
-    { label: t("home.categories.weight_management"), href: "/products?product_type=Weight Management" },
+    { label: t("home.categories.vitamins"), href: "/products?product_type=Vitamins%20%26%20Minerals" },
+    { label: t("home.categories.protein"), href: "/products?product_type=Protein%20%26%20Fitness" },
+    { label: t("home.categories.weight_management"), href: "/products?product_type=Weight%20Management" },
     { label: t("product.filter.sale"), href: "/products?sale=true" },
   ];
 

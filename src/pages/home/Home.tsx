@@ -36,8 +36,8 @@ export default function Home() {
           getProductList({ page: 0, limit: 12 }),
           getProductList({ page: 0, limit: 8 }),
         ]);
-        setFeaturedProducts(featured || []);
-        setNewArrivals(arrivals || []);
+        setFeaturedProducts(featured?.products || []);
+        setNewArrivals(arrivals?.products || []);
       } catch (error) {
         console.error("Error fetching products:", error);
       } finally {

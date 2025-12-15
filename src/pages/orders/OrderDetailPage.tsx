@@ -627,11 +627,11 @@ const OrderDetailPage: React.FC = () => {
           {/* Items */}
           <Paper sx={{ p: 3, mb: 3 }}>
             <Typography variant="h6" gutterBottom>
-              {t('orders.items', 'Items')} ({order.items.length})
+              {t('orders.items', 'Items')} ({order.items?.length || 0})
             </Typography>
             <Divider sx={{ mb: 2 }} />
             
-            {order.items.map((item) => (
+            {order.items?.map((item) => (
               <Box
                 key={item.id}
                 sx={{

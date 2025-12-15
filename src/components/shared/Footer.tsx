@@ -37,13 +37,13 @@ export default function Footer() {
   ];
 
   const categories = [
-    { label: "Vitamins & Minerals", href: "/products?category=Vitamins & Minerals" },
-    { label: "Protein & Fitness", href: "/products?category=Protein & Fitness" },
-    { label: "Weight Management", href: "/products?category=Weight Management" },
-    { label: "Beauty & Skin", href: "/products?category=Beauty & Skin" },
-    { label: "Digestive Health", href: "/products?category=Digestive Health" },
-    { label: "Brain & Focus", href: "/products?category=Brain & Focus" },
-    { label: "Immune Support", href: "/products?category=Immune Support" },
+    { label: "Vitamins & Minerals", href: "/products?category=Vitamins%20%26%20Minerals" },
+    { label: "Protein & Fitness", href: "/products?category=Protein%20%26%20Fitness" },
+    { label: "Weight Management", href: "/products?category=Weight%20Management" },
+    { label: "Beauty & Skin", href: "/products?category=Beauty%20%26%20Skin" },
+    { label: "Digestive Health", href: "/products?category=Digestive%20Health" },
+    { label: "Brain & Focus", href: "/products?category=Brain%20%26%20Focus" },
+    { label: "Immune Support", href: "/products?category=Immune%20Support" },
   ];
 
   return (

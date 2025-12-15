@@ -46,7 +46,10 @@ export const getProductList = async (filters: IProductFilters = {}) => {
     if (filters.certification) params.append("certification", filters.certification);
     if (filters.on_sale) params.append("on_sale", "true");
 
-    const response = await fetch(`${BACKEND_URL}/products?${params.toString()}`);
+    const url = `${BACKEND_URL}/products?${params.toString()}`;
+    console.log('[Product Service] Fetching:', url);
+    
+    const response = await fetch(url);
     
     if (response.ok) {
       return await response.json();

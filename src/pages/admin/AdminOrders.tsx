@@ -354,7 +354,7 @@ export default function AdminOrders() {
               {/* Items */}
               <Grid item xs={12}>
                 <Typography variant="subtitle1" fontWeight={600} gutterBottom>
-                  Items ({selectedOrder.items.length})
+                  Items ({selectedOrder.items?.length || 0})
                 </Typography>
                 <TableContainer>
                   <Table size="small">
@@ -368,7 +368,7 @@ export default function AdminOrders() {
                       </TableRow>
                     </TableHead>
                     <TableBody>
-                      {selectedOrder.items.map((item) => (
+                      {selectedOrder.items?.map((item) => (
                         <TableRow key={item.id}>
                           <TableCell>
                             <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
